@@ -21,9 +21,13 @@ fi
 
 cd "$project_dir"
 sources=()
+source_dirs=(src)
+if [[ -d tests ]]; then
+  source_dirs+=(tests)
+fi
 while IFS= read -r -d '' source_file; do
   sources+=("$source_file")
-done < <(find src -type f \( -name '*.cpp' -o -name '*.cppm' -o -name '*.h' -o -name '*.hpp' \) -print0)
+done < <(find "${source_dirs[@]}" -type f \( -name '*.cpp' -o -name '*.cppm' -o -name '*.h' -o -name '*.hpp' \) -print0)
 
 # Bash 3.2 (the macOS default) treats an empty array as unset with `set -u`.
 if [[ ${#sources[@]} -eq 0 ]]; then

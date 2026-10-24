@@ -90,6 +90,22 @@ build/macos/family-dashboard --preview build/display-preview.pbm
 sips -s format png build/display-preview.pbm --out build/display-preview.png
 ```
 
+## Text rendering
+
+The built-in 5x7 font covers printable ASCII (uppercase, lowercase, numbers,
+and punctuation), `ÅÄÖåäö`, `Éé`, the degree sign, euro sign, typographic quotes,
+dashes, ellipsis, and bullet. Text is decoded as UTF-8 and centered by character
+count. Unsupported Unicode and malformed UTF-8 use a visible `?` fallback;
+this small bitmap font does not cover all Unicode or combine accent marks.
+
+Native renderer tests cover character coverage, glyph width, UTF-8 centering,
+and invalid input:
+
+```sh
+cmake --build build/macos
+ctest --test-dir build/macos --output-on-failure
+```
+
 ## Coding style
 
 All C++ sources and module files use Allman braces with two-space indentation,

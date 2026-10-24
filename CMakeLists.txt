@@ -22,3 +22,14 @@ add_custom_target(format-check
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   COMMENT "Check C++ formatting")
 add_dependencies(family-dashboard format-check)
+
+include(CTest)
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+  add_executable(framebuffer-test tests/framebuffer_test.cpp)
+  target_compile_features(framebuffer-test PRIVATE cxx_std_26)
+  set_target_properties(framebuffer-test PROPERTIES CXX_EXTENSIONS OFF)
+  target_sources(framebuffer-test PRIVATE
+    FILE_SET CXX_MODULES FILES src/framebuffer.cppm)
+  add_dependencies(framebuffer-test format-check)
+  add_test(NAME framebuffer COMMAND framebuffer-test)
+endif()
