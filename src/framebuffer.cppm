@@ -82,16 +82,22 @@ array<unsigned char, 7> glyph(char letter)
     return {17, 17, 17, 31, 17, 17, 17};
   case 'I':
     return {31, 4, 4, 4, 4, 4, 31};
+  case 'K':
+    return {17, 18, 20, 24, 20, 18, 17};
   case 'L':
     return {16, 16, 16, 16, 16, 16, 31};
   case 'M':
     return {17, 27, 21, 21, 17, 17, 17};
+  case 'N':
+    return {17, 25, 25, 21, 19, 19, 17};
   case 'O':
     return {14, 17, 17, 17, 17, 17, 14};
   case 'R':
     return {30, 17, 17, 30, 20, 18, 17};
   case 'S':
     return {15, 16, 16, 14, 1, 1, 30};
+  case 'T':
+    return {31, 4, 4, 4, 4, 4, 4};
   case 'W':
     return {17, 17, 17, 21, 21, 21, 10};
   case 'Y':
@@ -138,7 +144,7 @@ mono_image test_image()
   image.rectangle(781, 16, 3, 448);
   centered_text(image, "FAMILY DASHBOARD", 70, 4);
   image.rectangle(64, 146, 672, 2);
-  centered_text(image, "HELLO WORLD", 218, 8);
+  centered_text(image, "HELLO KENT", 218, 8);
   for (int i = 0; i < 16; ++i)
   {
     if (i % 2 == 0)

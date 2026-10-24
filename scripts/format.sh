@@ -23,7 +23,13 @@ cd "$project_dir"
 sources=()
 while IFS= read -r -d '' source_file; do
   sources+=("$source_file")
-done < <(rg --files -0 src -g '*.cpp' -g '*.cppm' -g '*.h' -g '*.hpp')
+done < <(find src -type f \( -name '*.cpp' -o -name '*.cppm' -o -name '*.h' -o -name '*.hpp' \) -print0)
+
+# Bash 3.2 (the macOS default) treats an empty array as unset with `set -u`.
+if [[ ${#sources[@]} -eq 0 ]]; then
+  echo 'No C++ sources found under src/.' >&2
+  exit 1
+fi
 
 if [[ "$mode" == --check ]]; then
   "$formatter" --style=file --dry-run --Werror "${sources[@]}"

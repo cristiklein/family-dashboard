@@ -8,7 +8,7 @@ for the Tinkerboard S (ARMv7 hard-float). No container or VM.
 Install the native build tools with Homebrew:
 
 ```sh
-brew install llvm lld cmake ninja python@3.14 ripgrep
+brew install llvm lld cmake ninja python@3.14
 bash scripts/build.sh
 bash scripts/deploy.sh
 ```
@@ -106,7 +106,7 @@ bash scripts/format.sh --check  # Fail if formatting differs
 
 The configured CMake build also provides `format` and `format-check` targets.
 Building the executable automatically runs `format-check` and fails on drift.
-The script needs `rg` (ripgrep) and clang-format from the LLVM installation.
+The script uses the system's `find` and clang-format from the LLVM installation.
 Set `CLANG_FORMAT` to select a different formatter executable.
 
 ## Toolchain and compatibility
