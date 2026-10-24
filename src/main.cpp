@@ -1,7 +1,9 @@
 #include <cstdio>
+#include <print>
 
 import dashboard.greeting;
 
 int main() {
-  return std::puts(dashboard::greeting()) < 0 ? 1 : 0;
+  std::println("{}", dashboard::greeting());
+  return std::fflush(stdout) == 0 ? 0 : 1;
 }
