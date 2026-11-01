@@ -106,6 +106,37 @@ cmake --build build/macos
 ctest --test-dir build/macos --output-on-failure
 ```
 
+## VS Code
+
+Install the recommended **clangd** extension (`llvm-vs-code-extensions.vscode-clangd`).
+The workspace uses Homebrew clangd with experimental named-module support,
+C++26, and the native macOS compilation database. Microsoft C/C++ IntelliSense
+is disabled in this workspace to avoid competing module diagnostics; its debugger
+remains available. The workspace also treats `.cppm` files as C++.
+
+Generate the editor's build configuration and module artifacts once:
+
+```sh
+cmake -S . -B build/macos -G Ninja \
+  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++"
+cmake --build build/macos
+```
+
+CMake exports `build/macos/compile_commands.json` with the compiler flags for
+each source file. `.clangd` locates this database and removes CMake's module-file
+arguments so clangd can build and cache its own module artifacts. Keep the imports
+in `main.cpp` before the standard headers to avoid clangd preamble conflicts with
+libc++ declarations from the imported modules. Rebuild after changing module imports.
+The VS Code settings use the Apple Silicon Homebrew path `/opt/homebrew/opt/llvm`;
+adjust the compiler and clangd paths in `.vscode` if LLVM is installed elsewhere.
+The editor uses the macOS configuration; `scripts/build.sh` still cross-compiles
+the Linux display backend for the board.
+
+After switching extensions, run **Developer: Reload Window** from the Command
+Palette. Use **clangd: Restart language server** if diagnostics become stale.
+Named-module support in clangd is experimental; the CMake build is the final
+check for compiler errors. See [clangd's module support documentation](https://clangd.llvm.org/features#experimental-c20-modules-support).
+
 ## Coding style
 
 All C++ sources and module files use Allman braces with two-space indentation,

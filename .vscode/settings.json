@@ -1,0 +1,16 @@
+{
+  "files.associations": {
+    "*.cppm": "cpp"
+  },
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "clangd.path": "/opt/homebrew/opt/llvm/bin/clangd",
+  "clangd.arguments": [
+    "--experimental-modules-support",
+    "--background-index"
+  ],
+  "cmake.buildDirectory": "${workspaceFolder}/build/macos",
+  "cmake.generator": "Ninja",
+  "cmake.configureSettings": {
+    "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++"
+  }
+}

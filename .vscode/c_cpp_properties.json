@@ -1,0 +1,12 @@
+{
+  "configurations": [
+    {
+      "name": "macOS (Homebrew LLVM)",
+      "compilerPath": "/opt/homebrew/opt/llvm/bin/clang++",
+      "compileCommands": "${workspaceFolder}/build/macos/compile_commands.json",
+      "cppStandard": "c++26",
+      "intelliSenseMode": "macos-clang-arm64"
+    }
+  ],
+  "version": 4
+}

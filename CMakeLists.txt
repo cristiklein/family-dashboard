@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.30)
 project(family_dashboard LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 add_executable(family-dashboard src/main.cpp)
 target_compile_features(family-dashboard PRIVATE cxx_std_26)
 set_target_properties(family-dashboard PROPERTIES CXX_EXTENSIONS OFF)

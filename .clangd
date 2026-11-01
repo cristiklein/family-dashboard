@@ -1,0 +1,4 @@
+CompileFlags:
+  CompilationDatabase: build/macos
+  # Let clangd build its own module files instead of loading CMake's BMIs.
+  Remove: ['@*.modmap', '-fmodule-file=*']
