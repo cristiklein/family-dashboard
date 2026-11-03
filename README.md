@@ -144,7 +144,10 @@ sips -s format png build/morning.pbm --out build/morning.png
 sips -s format png build/afternoon.pbm --out build/afternoon.png
 ```
 
-Both layouts show a 24-hour clock (HH:MM) using the machine's local timezone.
+Both layouts show a 24-hour clock (HH:MM) and the current date using the
+machine's local timezone. The morning agenda is labelled with today's date;
+the afternoon agenda uses tomorrow's calendar date, including across month,
+year, and daylight-saving boundaries. Date labels use English abbreviations.
 The browser preview advances it each minute; a physical display command draws
 the time at invocation and still needs scheduling for ongoing minute updates.
 On the Pi, set the timezone to `Europe/Stockholm` with `sudo raspi-config` if needed.

@@ -1,9 +1,11 @@
 module;
 
+#include <array>
 #include <chrono>
 #include <ctime>
 #include <format>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 export module dashboard.layout;
@@ -14,6 +16,23 @@ using namespace std;
 
 namespace
 {
+
+string date_label(chrono::sys_days date, bool include_month)
+{
+  constexpr array<string_view, 7> weekdays{"SUN", "MON", "TUE", "WED",
+                                           "THU", "FRI", "SAT"};
+  constexpr array<string_view, 12> months{"JAN", "FEB", "MAR", "APR",
+                                          "MAY", "JUN", "JUL", "AUG",
+                                          "SEP", "OCT", "NOV", "DEC"};
+  const chrono::year_month_day civil{date};
+  const auto label =
+      format("{} {:02}", weekdays[chrono::weekday{date}.c_encoding()],
+             static_cast<unsigned>(civil.day()));
+  return include_month
+             ? format("{} {}", label,
+                      months[static_cast<unsigned>(civil.month()) - 1])
+             : label;
+}
 
 void event(dashboard::mono_image &image, int y, string_view time,
            string_view title, string_view detail)
@@ -37,7 +56,7 @@ void checkbox(dashboard::mono_image &image, int x, int y, string_view label)
 export namespace dashboard
 {
 
-// The clock is live; the remaining content is fixed fictional sample data.
+// The clock and date labels are live; other content is fictional sample data.
 // Accept a time explicitly so layout tests can render reproducible images.
 mono_image sample_dashboard(
     bool afternoon,
@@ -49,15 +68,23 @@ mono_image sample_dashboard(
   {
     throw runtime_error("Cannot determine local time for dashboard clock");
   }
+  // Advance the local civil date, rather than adding 24 hours across DST.
+  const chrono::sys_days today{
+      chrono::year{local.tm_year + 1900} /
+      chrono::month{static_cast<unsigned>(local.tm_mon + 1)} /
+      chrono::day{static_cast<unsigned>(local.tm_mday)}};
+  const auto agenda_day = today + chrono::days{afternoon ? 1 : 0};
   mono_image image;
   draw_text(image, afternoon ? "Good afternoon!" : "Good morning!", 24, 20, 4);
   draw_text(image, format("{:02}:{:02}", local.tm_hour, local.tm_min), 660, 12,
             4);
-  draw_text(image, "MON 02 NOV", 658, 46, 2);
+  draw_text(image, date_label(today, true), 658, 46, 2);
   image.rectangle(24, 66, 752, 2);
 
-  draw_text(image, afternoon ? "TOMORROW / TUE 03" : "TODAY / MON 02", 24, 90,
-            3);
+  draw_text(image,
+            format("{} / {}", afternoon ? "TOMORROW" : "TODAY",
+                   date_label(agenda_day, false)),
+            24, 90, 3);
   image.rectangle(506, 90, 2, 262);
 
   if (afternoon)
