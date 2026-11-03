@@ -40,8 +40,9 @@ stored in this repository.
 
 The display test targets the Waveshare 7.5-inch **black-and-white V2, 800x480**,
 with its Driver HAT plugged directly into the Tinkerboard's 40-pin header.
-It uses the newer V2 full-refresh initialization and OTP waveform, not the
-separate legacy V2 software-waveform driver or the color/HD panel drivers.
+It defaults to the V2 partial-refresh waveform over the full panel. Full and
+fast refresh are available only when explicitly selected. No automatic cleaning
+refresh or fallback is performed during this partial-only experiment.
 
 ```sh
 bash scripts/build.sh
@@ -52,7 +53,8 @@ bash scripts/display.sh
 The first two commands build, upload, and print `hello world`. The third sends
 a test image with a border, `FAMILY DASHBOARD`, `HELLO WORLD`, and a checker
 pattern to the panel, waits for refresh completion, and puts it into deep sleep.
-The image remains visible after power-down. Refreshes flash the screen.
+The image remains visible after power-down. Partial refresh aims to avoid the
+whole-screen flash; full and fast refresh can flash.
 
 `display.sh` requires TinkerOS's `gpio` utility and passwordless `sudo` (as on
 this board). It temporarily switches WiringPi pins 0, 5, 6, and 1 to GPIO,
@@ -122,6 +124,51 @@ The executable provides `--display-morning` and `--display-afternoon` for direct
 use on the board. The existing `--preview`, `--display`, and display script
 without a mode continue to use the hardware test image (`--test` selects it
 explicitly).
+
+To compare the vendor's fast refresh mode with full refresh:
+
+```sh
+bash scripts/display.sh --morning --fast
+bash scripts/display.sh --afternoon --fast
+bash scripts/display.sh --morning --full
+```
+
+Rebuild and upload after changing the executable. Direct board commands also
+accept a trailing `--partial`, `--fast`, or `--full`, for example
+`family-dashboard-hello --display-morning --partial`. Partial refresh is the
+default in the executable and display script. Fast mode follows
+`EPD_7IN5_V2_Init_Fast` in the
+[Waveshare reference driver](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_7in5_V2.c),
+using the same image transfer and power-off/deep-sleep sequence. This is a
+whole-screen fast refresh, not a partial update. It may still flash; actual
+speed, contrast, and ghosting need verification on the physical panel. If
+afterimages appear, use `--full` for a cleaning refresh. Refresh timing is
+printed by the executable for comparison.
+
+To experiment with an update that avoids the whole-screen flash:
+
+```sh
+bash scripts/build.sh
+bash scripts/deploy.sh
+bash scripts/display.sh --demo-partial
+```
+
+The demo draws morning with partial refresh, waits five seconds, then switches
+to afternoon with another partial refresh. There is no initial fast or full
+refresh. Watch both transitions for flashing, inverted text, or afterimages. This
+uses the vendor's partial initialization and window commands, with white=1
+pixel data as in its Python driver. The controller stays powered between the
+two images and enters deep sleep after the demo. The direct executable option
+is `--demo-partial`; it cannot be combined with layout or refresh flags in the
+display script.
+
+Normal display commands now also attempt standalone partial updates after waking
+from deep sleep, using the retained visible image without restoring controller
+RAM. This wake-up behavior still needs verification on the panel; the earlier
+demo verified partial updates within one powered session. Ghosting may accumulate
+during this experiment. No full or fast refresh is triggered automatically, even
+after an error. If desired, explicitly use
+`bash scripts/display.sh --afternoon --full` for a cleaning refresh.
 
 ### Font coverage
 

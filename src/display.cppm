@@ -30,6 +30,18 @@ import dashboard.framebuffer;
 
 using namespace std;
 
+export namespace dashboard
+{
+
+enum class refresh_mode
+{
+  full,
+  fast,
+  partial
+};
+
+} // namespace dashboard
+
 #ifdef __linux__
 namespace
 {
@@ -198,8 +210,9 @@ public:
 };
 
 // Register sequence adapted from Waveshare's EPD_7in5_V2.c, V3.0 (2023-12-18).
-// See third_party/Waveshare-LICENSE.txt. Uses full refresh and the panel's OTP
-// LUT.
+// See third_party/Waveshare-LICENSE.txt. Full and fast initialization use the
+// panel's OTP waveforms; fast follows EPD_7IN5_V2_Init_Fast. Partial updates
+// follow Init_Part / Display_Part, with white=1 as in the Python driver.
 class epaper
 {
   spi_bus spi_;
@@ -220,7 +233,80 @@ public:
     {
     }
   }
-  void show(const dashboard::mono_image &image)
+  void show(const dashboard::mono_image &image, dashboard::refresh_mode mode)
+  {
+    refresh(image, mode);
+    sleep();
+  }
+
+  void partial_demo(const dashboard::mono_image &first,
+                    const dashboard::mono_image &second)
+  {
+    println("Drawing initial image with partial refresh...");
+    refresh(first, dashboard::refresh_mode::partial);
+    println("Initial image ready. Partial update in 5 seconds...");
+    fflush(stdout);
+    delay(5000);
+    refresh(second, dashboard::refresh_mode::partial);
+    sleep();
+  }
+
+private:
+  void refresh_partial(const dashboard::mono_image &image)
+  {
+    reset();
+    command(0x00, {0x1f});
+    command(0x04);
+    delay(100);
+    wait_ready("power on");
+    command(0xe0, {0x02});
+    command(0xe5, {0x6e});
+    command(0x50, {0xa9, 0x07});
+    command(0x91); // Enter partial mode.
+    // Inclusive window: x=0..799, y=0..479. Byte-aligned full-panel window.
+    command(0x90, {0x00, 0x00, 0x03, 0x1f, 0x00, 0x00, 0x01, 0xdf, 0x01});
+    command(0x13);
+    // Partial data has the opposite polarity from our full/fast 0x13 data.
+    data(image.pixels);
+    turn_on_display();
+  }
+
+  void refresh(const dashboard::mono_image &image, dashboard::refresh_mode mode)
+  {
+    if (mode == dashboard::refresh_mode::partial)
+    {
+      refresh_partial(image);
+      return;
+    }
+    initialize(mode);
+    command(0x10);
+    data(image.pixels);
+    auto inverted = image.pixels;
+    for (auto &byte : inverted)
+    {
+      byte ^= 0xff;
+    }
+    command(0x13);
+    data(inverted);
+    turn_on_display();
+  }
+
+  void turn_on_display()
+  {
+    command(0x12);
+    delay(100);
+    wait_ready("refresh");
+  }
+
+  void sleep()
+  {
+    command(0x50, {0xf7});
+    command(0x02);
+    wait_ready("power off");
+    command(0x07, {0xa5}); // Deep sleep; the image remains visible.
+  }
+
+  void reset()
   {
     reset_.set(true);
     delay(20);
@@ -228,6 +314,24 @@ public:
     delay(2);
     reset_.set(true);
     delay(20);
+  }
+
+  void initialize(dashboard::refresh_mode mode)
+  {
+    reset();
+
+    if (mode == dashboard::refresh_mode::fast)
+    {
+      command(0x00, {0x1f}); // Black/white, OTP waveform.
+      command(0x50, {0x10, 0x07});
+      command(0x04);
+      delay(100);
+      wait_ready("power on");
+      command(0x06, {0x27, 0x27, 0x18, 0x17}); // Fast booster soft start.
+      command(0xe0, {0x02});
+      command(0xe5, {0x5a}); // Vendor's fast waveform temperature setting.
+      return;
+    }
 
     command(0x01, {0x07, 0x07, 0x3f, 0x3f}); // Power setting.
     command(0x06, {0x17, 0x17, 0x28, 0x17}); // Booster soft start.
@@ -239,27 +343,8 @@ public:
     command(0x15, {0x00});
     command(0x50, {0x10, 0x07});
     command(0x60, {0x22});
-
-    command(0x10);
-    data(image.pixels);
-    auto inverted = image.pixels;
-    for (auto &byte : inverted)
-    {
-      byte ^= 0xff;
-    }
-    command(0x13);
-    data(inverted);
-    command(0x12);
-    delay(100);
-    wait_ready("refresh");
-
-    command(0x50, {0xf7});
-    command(0x02);
-    wait_ready("power off");
-    command(0x07, {0xa5}); // Deep sleep; the image remains visible.
   }
 
-private:
   void command(uint8_t value, initializer_list<uint8_t> bytes = {})
   {
     dc_.set(false);
@@ -301,11 +386,23 @@ private:
 export namespace dashboard
 {
 
-void show_on_display(const mono_image &image)
+void show_on_display(const mono_image &image,
+                     refresh_mode mode = refresh_mode::partial)
 {
 #ifdef __linux__
   epaper panel;
-  panel.show(image);
+  panel.show(image, mode);
+#else
+  throw runtime_error("Display output requires Linux; use --preview on macOS");
+#endif
+}
+
+// Two partial updates in one session; no initial fast/full cleaning refresh.
+void show_partial_demo(const mono_image &first, const mono_image &second)
+{
+#ifdef __linux__
+  epaper panel;
+  panel.partial_demo(first, second);
 #else
   throw runtime_error("Display output requires Linux; use --preview on macOS");
 #endif
