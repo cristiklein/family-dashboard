@@ -1,23 +1,25 @@
 module;
 
 #include <algorithm>
-#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <initializer_list>
 #include <print>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
 #include <vector>
 
 #ifdef __linux__
 #include <fcntl.h>
+#include <linux/gpio.h>
 #include <linux/spi/spidev.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
@@ -57,6 +59,9 @@ class file_handle
   int fd_;
 
 public:
+  explicit file_handle(int fd) : fd_(fd)
+  {
+  }
   explicit file_handle(const string &path, int flags)
       : fd_(::open(path.c_str(), flags | O_CLOEXEC))
   {
@@ -77,14 +82,28 @@ public:
   }
 };
 
-void write_file(const string &path, const string &text)
+string gpio_chip_path()
 {
-  file_handle file(path, O_WRONLY);
-  if (::write(file.get(), text.data(), text.size()) !=
-      static_cast<ssize_t>(text.size()))
+  // GPIO chip numbering is not an ABI. Match the Zero 2 W's controller label.
+  for (const auto &entry : filesystem::directory_iterator("/dev"))
   {
-    fail("write " + path);
+    if (!entry.path().filename().string().starts_with("gpiochip"))
+    {
+      continue;
+    }
+    file_handle chip(entry.path().string(), O_RDONLY);
+    gpiochip_info info{};
+    if (::ioctl(chip.get(), GPIO_GET_CHIPINFO_IOCTL, &info) < 0)
+    {
+      fail("inspect GPIO chip " + entry.path().string());
+    }
+    if (string_view(info.label) == "pinctrl-bcm2835")
+    {
+      return entry.path().string();
+    }
   }
+  throw runtime_error(
+      "Raspberry Pi Zero GPIO controller not found in /dev/gpiochip*");
 }
 
 void delay(int ms)
@@ -94,26 +113,13 @@ void delay(int ms)
 
 class gpio_pin
 {
-  int number_;
-  string path_;
+  file_handle line_;
   bool output_;
 
 public:
-  gpio_pin(int number, const char *direction)
-      : number_(number), path_("/sys/class/gpio/gpio" + to_string(number)),
-        output_(strcmp(direction, "in") != 0)
+  gpio_pin(int chip, uint32_t number, bool output, bool initial = false)
+      : line_(request_line(chip, number, output, initial)), output_(output)
   {
-    // Refuse to take over an export belonging to another process.
-    write_file("/sys/class/gpio/export", to_string(number_));
-    try
-    {
-      write_file(path_ + "/direction", direction);
-    }
-    catch (...)
-    {
-      unexport();
-      throw;
-    }
   }
   ~gpio_pin()
   {
@@ -127,46 +133,60 @@ public:
       {
       }
     }
-    unexport();
   }
   gpio_pin(const gpio_pin &) = delete;
   gpio_pin &operator=(const gpio_pin &) = delete;
 
   void set(bool high)
   {
-    write_file(path_ + "/value", high ? "1" : "0");
+    gpio_v2_line_values values{};
+    values.mask = 1;
+    values.bits = high ? 1 : 0;
+    if (::ioctl(line_.get(), GPIO_V2_LINE_SET_VALUES_IOCTL, &values) < 0)
+    {
+      fail("set GPIO line");
+    }
   }
   bool high() const
   {
-    file_handle file(path_ + "/value", O_RDONLY);
-    char value;
-    if (::read(file.get(), &value, 1) != 1)
+    gpio_v2_line_values values{};
+    values.mask = 1;
+    if (::ioctl(line_.get(), GPIO_V2_LINE_GET_VALUES_IOCTL, &values) < 0)
     {
-      fail("read " + path_);
+      fail("read GPIO line");
     }
-    if (value != '0' && value != '1')
-    {
-      throw runtime_error("Invalid GPIO input");
-    }
-    return value == '1';
+    return (values.bits & 1) != 0;
   }
 
 private:
-  void unexport() noexcept
+  static int request_line(int chip, uint32_t number, bool output, bool initial)
   {
-    try
+    gpio_v2_line_request request{};
+    request.offsets[0] = number;
+    request.num_lines = 1;
+    strcpy(request.consumer, "family-dashboard");
+    request.config.flags =
+        output ? GPIO_V2_LINE_FLAG_OUTPUT : GPIO_V2_LINE_FLAG_INPUT;
+    if (output)
     {
-      write_file("/sys/class/gpio/unexport", to_string(number_));
+      // Set direction and initial value together, avoiding a startup glitch.
+      request.config.num_attrs = 1;
+      request.config.attrs[0].mask = 1;
+      request.config.attrs[0].attr.id = GPIO_V2_LINE_ATTR_ID_OUTPUT_VALUES;
+      request.config.attrs[0].attr.values = initial ? 1 : 0;
     }
-    catch (...)
+    if (::ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &request) < 0)
     {
+      fail("request BCM GPIO " + to_string(number));
     }
+    // The request exclusively holds the line until the returned fd is closed.
+    return request.fd;
   }
 };
 
 class spi_bus
 {
-  file_handle device_{"/dev/spidev2.0", O_RDWR};
+  file_handle device_{"/dev/spidev0.0", O_RDWR};
 
 public:
   spi_bus()
@@ -189,13 +209,11 @@ public:
   {
     while (!bytes.empty())
     {
-      // Small full-duplex transfers avoid the old Rockchip TX-only DMA path.
-      // MISO is unused by the panel; received bytes are discarded.
-      array<uint8_t, 32> received{};
-      const auto size = min<size_t>(bytes.size(), received.size());
+      // Stay within spidev's default 4096-byte transfer buffer. The panel
+      // accepts consecutive transfers while DC remains high; MISO is unused.
+      const auto size = min<size_t>(bytes.size(), 4096);
       spi_ioc_transfer transfer{};
       transfer.tx_buf = reinterpret_cast<uintptr_t>(bytes.data());
-      transfer.rx_buf = reinterpret_cast<uintptr_t>(received.data());
       transfer.len = size;
       transfer.bits_per_word = 8;
       transfer.speed_hz = 500'000;
@@ -216,10 +234,11 @@ public:
 class epaper
 {
   spi_bus spi_;
-  gpio_pin power_{184, "high"}; // Physical pin 12; newer HAT power enable.
-  gpio_pin reset_{164, "high"}; // Physical pin 11.
-  gpio_pin dc_{171, "low"};     // Physical pin 22.
-  gpio_pin busy_{163, "in"};    // Physical pin 18; active LOW.
+  file_handle gpio_chip_{gpio_chip_path(), O_RDONLY};
+  gpio_pin power_{gpio_chip_.get(), 18, true, true}; // Physical pin 12.
+  gpio_pin reset_{gpio_chip_.get(), 17, true, true}; // Physical pin 11.
+  gpio_pin dc_{gpio_chip_.get(), 25, true};          // Physical pin 22.
+  gpio_pin busy_{gpio_chip_.get(), 24, false}; // Physical pin 18; active LOW.
 public:
   ~epaper()
   {

@@ -1,7 +1,8 @@
 # Family dashboard
 
 C++26 family dashboard using named modules, cross-compiled directly on macOS
-for the Tinkerboard S (ARMv7 hard-float). No container or VM.
+for Raspberry Pi Zero 2 W running 64-bit Raspberry Pi OS (Debian Trixie).
+No container, VM, or compiler installation on the Pi is needed.
 
 ## Build and upload
 
@@ -13,15 +14,15 @@ bash scripts/build.sh
 bash scripts/deploy.sh
 ```
 
-The build script uses Homebrew Clang and LLD to produce a static ARM Linux
-executable at `build/armv7-native/family-dashboard`. On first run it downloads
-Debian trixie ARM headers and libraries into `build/sysroot`. Packages are
+The build script uses Homebrew Clang and LLD to produce a static ARM64 Linux
+executable at `build/arm64-native/family-dashboard`. On first run it downloads
+Debian trixie ARM64 headers and libraries into `build/sysroot-arm64`. Packages are
 SHA256-checked against the Debian package index fetched over HTTPS; package
-names, versions, URLs, and hashes are recorded in `build/sysroot/packages.json`.
+names, versions, URLs, and hashes are recorded in `build/sysroot-arm64/packages.json`.
 These target packages are extracted locally, never installed on macOS.
 
-The deploy script uses its configured SSH destination, uploads the executable to
-`~/.local/bin/family-dashboard-hello`, and runs it. Expected output:
+The deploy script defaults to `cklein@zero.local`, uploads the executable to
+`~/.local/bin/family-dashboard`, and runs it. Expected output:
 
 ```text
 hello world
@@ -30,7 +31,7 @@ hello world
 An alternative SSH destination can be supplied as the first argument:
 
 ```sh
-bash scripts/deploy.sh linaro@tinkerboard.local
+bash scripts/deploy.sh your-user@zero.local
 ```
 
 SSH uses your normal keys or interactive password prompt. Passwords are not
@@ -38,47 +39,66 @@ stored in this repository.
 
 ## Display test
 
-The display test targets the Waveshare 7.5-inch **black-and-white V2, 800x480**,
-with its Driver HAT plugged directly into the Tinkerboard's 40-pin header.
-It defaults to the V2 partial-refresh waveform over the full panel. Full and
-fast refresh are available only when explicitly selected. No automatic cleaning
-refresh or fallback is performed during this partial-only experiment.
+The display backend targets the Waveshare 7.5-inch **black-and-white V2,
+800x480**, with its Driver HAT on the Zero 2 W's 40-pin header. The Pi needs a
+soldered header (or properly wired connections). Power off before attaching the
+HAT, and align pin 1 on both boards.
+
+Once, on the Pi, enable SPI and grant your login account device access:
+
+```sh
+sudo raspi-config nonint do_spi 0
+sudo usermod -aG spi,gpio "$USER"
+sudo reboot
+```
+
+After reconnecting, check the devices and login groups:
+
+```sh
+ls -l /dev/spidev0.0 /dev/gpiochip*
+id
+```
+
+The executable uses `/dev/spidev0.0` and discovers the GPIO controller by its
+`pinctrl-bcm2835` label rather than assuming a GPIO chip number. The `spi` and
+`gpio` groups allow display commands to run as your normal user without sudo. A permission error means the device permissions or login
+groups need checking.
+
+Build, deploy, and explicitly use a full refresh for the first hardware test:
 
 ```sh
 bash scripts/build.sh
 bash scripts/deploy.sh
-bash scripts/display.sh
+bash scripts/display.sh --test --full
 ```
 
 The first two commands build, upload, and print `hello world`. The third sends
-a test image with a border, `FAMILY DASHBOARD`, `HELLO WORLD`, and a checker
-pattern to the panel, waits for refresh completion, and puts it into deep sleep.
-The image remains visible after power-down. Partial refresh aims to avoid the
-whole-screen flash; full and fast refresh can flash.
+a test image with a border, greeting, and checker pattern to the panel, waits
+for completion, then powers down and enters deep sleep. The image remains
+visible. Full and fast refresh may flash the screen. Normal display commands
+still default to the experimental partial waveform; they do not perform an
+automatic cleaning refresh or fallback.
 
-`display.sh` requires TinkerOS's `gpio` utility and passwordless `sudo` (as on
-this board). It temporarily switches WiringPi pins 0, 5, 6, and 1 to GPIO,
-including pins assigned to UART4 and PCM/I2S at boot. Those header functions
-cannot be used simultaneously with this HAT. No boot configuration is edited.
-The executable exports GPIOs through sysfs, refuses existing exports, and
-unexports its pins on normal completion or C++ exceptions. Output pins are
-driven low when released. BUSY waits time out after 30 seconds.
-
-| Signal | Physical header pin | Linux GPIO / SPI |
+| Signal | Physical header pin | BCM GPIO / SPI |
 | --- | --- | --- |
-| MOSI | 19 | SPI2 MOSI |
-| CLK | 23 | SPI2 SCLK |
-| CS | 24 | SPI2 CS0 (`/dev/spidev2.0`) |
-| RST | 11 | 164 |
-| DC | 22 | 171 |
-| BUSY | 18 | 163 |
-| PWR (newer HATs) | 12 | 184 |
+| MOSI | 19 | GPIO10 / SPI0 MOSI |
+| CLK | 23 | GPIO11 / SPI0 SCLK |
+| CS | 24 | GPIO8 / SPI0 CE0 (`/dev/spidev0.0`) |
+| RST | 11 | GPIO17 |
+| DC | 22 | GPIO25 |
+| BUSY | 18 | GPIO24; active LOW |
+| PWR (newer HATs) | 12 | GPIO18 |
 
-SPI mode 0, 8-bit words, 500 kHz, at most 32 bytes per full-duplex transfer
-(received data is discarded). Larger TX-only transfers produced missing text
-and barcode-like stripes on this board's old Rockchip driver; the smaller
-full-duplex transfers produced the correct full image. No external GPIO
-library is linked into the executable. Register settings are adapted from
+The control lines use Linux's GPIO character-device v2 API, with exclusive
+line ownership and initial output levels set atomically. Lines already in use
+are rejected. Outputs are driven low during normal cleanup, and closing their
+file descriptors releases the line requests. BUSY waits time out after 30
+seconds. SPI uses mode 0, 8-bit words, 500 kHz, and transfers of up to 4096
+bytes; the kernel controls chip select. MISO is unused. No external GPIO library
+is linked into the executable.
+
+Wiring follows [Waveshare's HAT manual](https://www.waveshare.com/wiki/7.5inch_e-Paper_HAT_Manual).
+Panel register settings are adapted from
 [Waveshare's reference driver](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_7in5_V2.c);
 its license is in `third_party/Waveshare-LICENSE.txt`.
 
@@ -119,7 +139,7 @@ bash scripts/display.sh --afternoon
 ```
 
 The display script also accepts an SSH target, for example
-`bash scripts/display.sh linaro@tinkerboard.local --morning`.
+`bash scripts/display.sh your-user@zero.local --morning`.
 The executable provides `--display-morning` and `--display-afternoon` for direct
 use on the board. The existing `--preview`, `--display`, and display script
 without a mode continue to use the hardware test image (`--test` selects it
@@ -135,7 +155,7 @@ bash scripts/display.sh --morning --full
 
 Rebuild and upload after changing the executable. Direct board commands also
 accept a trailing `--partial`, `--fast`, or `--full`, for example
-`family-dashboard-hello --display-morning --partial`. Partial refresh is the
+`family-dashboard --display-morning --partial`. Partial refresh is the
 default in the executable and display script. Fast mode follows
 `EPD_7IN5_V2_Init_Fast` in the
 [Waveshare reference driver](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_7in5_V2.c),
@@ -164,9 +184,8 @@ display script.
 
 Normal display commands now also attempt standalone partial updates after waking
 from deep sleep, using the retained visible image without restoring controller
-RAM. This wake-up behavior still needs verification on the panel; the earlier
-demo verified partial updates within one powered session. Ghosting may accumulate
-during this experiment. No full or fast refresh is triggered automatically, even
+RAM. This wake-up behavior and all refresh modes still need verification on
+the Zero 2 W. Ghosting may accumulate during this experiment. No full or fast refresh is triggered automatically, even
 after an error. If desired, explicitly use
 `bash scripts/display.sh --afternoon --full` for a cleaning refresh.
 
@@ -239,40 +258,36 @@ Set `CLANG_FORMAT` to select a different formatter executable.
 ## Toolchain and compatibility
 
 CMake and Ninja track named-module dependencies using Clang's module scanner.
-The toolchain sets `--target=arm-linux-gnueabihf`, the local Linux sysroot, and
-LLD for ELF linking. Apple Clang and the macOS linker are not used.
+`cmake/zero.cmake` targets `aarch64-linux-gnu` and Cortex-A53, uses the local
+ARM64 Linux sysroot, and links with LLD. Apple Clang and the macOS linker are
+not used for the Linux executable.
 
-For this smoke test, the executable is statically linked, avoiding a dependency
-on the board's installed glibc or libstdc++ versions. ARMv7 hard-float and a
-Linux kernel compatible with the toolchain are still required. Successful
-execution on the board is the final compatibility check.
-
-Before adding networking, graphics, and GPIO dependencies, inspect the board:
-
-```sh
-cat /etc/os-release
-uname -m
-getconf GNU_LIBC_VERSION
-dpkg --print-architecture
-```
-
-The inspected board runs Debian 9 (stretch), kernel 4.4.132, with SPI2 enabled.
-Choose a target sysroot and runtime deployment strategy for future dynamic
-dependencies; this display test is still a standalone static executable.
+The ARM64 executable is statically linked, avoiding target-side glibc and
+libstdc++ version dependencies. The Linux GPIO v2 API requires kernel 5.10 or
+newer; the target is the Zero 2 W on 64-bit Raspberry Pi OS Trixie. Actual
+execution and display output on the Pi are the final compatibility checks.
 
 `LLVM_ROOT`, `LLD_ROOT`, and `PYTHON` override the build script's Homebrew tool
 locations. Downloads and generated outputs are contained in the ignored
-`build/` directory. Delete that directory to refresh all target packages.
+`build/` directory. Delete `build/sysroot-arm64` and the relevant downloads to
+refresh target packages.
 
 ## Verification
 
-The native macOS cross-build passed with Clang/LLD 23.1.4, CMake 4.4.4, and
-Ninja 1.13.2. ELF inspection confirms ARMv7, hard-float ABI, static linking,
-and a Linux 3.2 minimum kernel note. Script syntax checks passed.
+Before deployment, run:
 
-The binary was uploaded over SSH and prints `hello world` on the board.
-Both ARM and macOS builds pass, and the generated preview was visually checked.
-The ARM and macOS preview files have identical SHA-256 hashes. The display
-refresh takes about 3.6 seconds, followed by power-off and deep sleep. The user
-confirmed the complete test image is correct on the physical panel after the
-SPI transfer fix. All GPIO exports owned by the application were released.
+```sh
+bash scripts/format.sh --check
+bash scripts/build.sh
+cmake -S . -B build/macos -G Ninja \
+  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++"
+cmake --build build/macos
+ctest --test-dir build/macos --output-on-failure
+```
+
+Native tests exercise framebuffer and UTF-8 rendering. The ARM64 build compiles
+the Linux SPI and GPIO code but does not exercise hardware. After deployment,
+run the greeting and generate a preview on the Pi before testing the HAT. Start
+with `--test --full`, then validate morning/afternoon layouts, fast refresh,
+and partial refresh on the physical panel. The Zero hardware path is not yet
+verified.

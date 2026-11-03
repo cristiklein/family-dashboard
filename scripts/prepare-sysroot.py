@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract Debian ARM libraries locally; no installation or Linux host required."""
+"""Extract Debian ARM64 libraries locally; no installation or Linux host required."""
 
 import hashlib
 import io
@@ -11,7 +11,7 @@ import tarfile
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1] / "build"
-SYSROOT = ROOT / "sysroot"
+SYSROOT = ROOT / "sysroot-arm64"
 CACHE = ROOT / "downloads"
 MIRROR = "https://deb.debian.org/debian"
 PACKAGES = {
@@ -28,24 +28,27 @@ def fetch(url):
 
 def main():
     SYSROOT.mkdir(parents=True, exist_ok=True)
+    (SYSROOT / "usr/lib").mkdir(parents=True, exist_ok=True)
     # Debian's merged-/usr layout is normally established by base-files.
     # The library packages alone do not supply this root-level symlink.
-    if not (SYSROOT / "lib").exists():
+    if not (SYSROOT / "lib").exists() and not (SYSROOT / "lib").is_symlink():
         (SYSROOT / "lib").symlink_to("usr/lib", target_is_directory=True)
     marker = SYSROOT / "packages.json"
     if marker.exists():
-        print(f"Using ARM sysroot: {SYSROOT}")
+        print(f"Using ARM64 sysroot: {SYSROOT}")
         return
     CACHE.mkdir(parents=True, exist_ok=True)
     SYSROOT.mkdir(parents=True, exist_ok=True)
-    index = CACHE / "trixie-armhf-Packages.xz"
+    index = CACHE / "trixie-arm64-Packages.xz"
     if not index.exists():
-        index.write_bytes(fetch(f"{MIRROR}/dists/trixie/main/binary-armhf/Packages.xz"))
+        index.write_bytes(fetch(f"{MIRROR}/dists/trixie/main/binary-arm64/Packages.xz"))
     records = {}
     for paragraph in lzma.decompress(index.read_bytes()).decode().split("\n\n"):
         fields = dict(line.split(": ", 1) for line in paragraph.splitlines()
                       if line and not line[0].isspace() and ": " in line)
         if fields.get("Package") in PACKAGES:
+            if fields.get("Architecture") not in ("arm64", "all"):
+                raise RuntimeError(f"Unexpected package architecture: {fields}")
             records[fields["Package"]] = fields
     missing = PACKAGES - records.keys()
     if missing:
@@ -64,9 +67,9 @@ def main():
         with tarfile.open(fileobj=io.BytesIO(archive)) as data:
             data.extractall(SYSROOT, filter="data")
         manifest.append({key: record[key] for key in
-                         ("Package", "Version", "Filename", "SHA256")})
+                         ("Package", "Architecture", "Version", "Filename", "SHA256")})
     marker.write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"Prepared ARM sysroot: {SYSROOT}")
+    print(f"Prepared ARM64 sysroot: {SYSROOT}")
 
 
 if __name__ == "__main__":

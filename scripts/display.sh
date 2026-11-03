@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-target="linaro@192.168.1.183"
+target="cklein@zero.local"
 display_option=--display
 refresh_option=--partial
 target_set=false
@@ -38,16 +38,10 @@ if [[ "$partial_demo" == true ]]; then
   display_arguments=--demo-partial
 fi
 
-# WiringPi/TinkerOS pin numbers here are different from Linux GPIO numbers.
-# This temporarily switches UART4's header pins and the HAT power pin to GPIO;
-# it does not edit boot configuration. Use only with the directly attached HAT.
+# The executable requests the HAT GPIO lines through the kernel character API.
+# Raspberry Pi OS grants access through the spi and gpio groups.
 ssh "$target" '
   set -eu
-  test -x "$HOME/.local/bin/family-dashboard-hello"
-  command -v gpio >/dev/null
-  sudo -n gpio mode 1 out
-  sudo -n gpio mode 0 out
-  sudo -n gpio mode 6 out
-  sudo -n gpio mode 5 in
-  exec sudo -n "$HOME/.local/bin/family-dashboard-hello" '"$display_arguments"'
+  test -x "$HOME/.local/bin/family-dashboard"
+  exec "$HOME/.local/bin/family-dashboard" '"$display_arguments"'
 '

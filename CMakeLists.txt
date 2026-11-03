@@ -10,7 +10,7 @@ target_sources(family-dashboard PRIVATE
   FILE_SET CXX_MODULES FILES
     src/greeting.cppm src/framebuffer.cppm src/display.cppm src/layout.cppm)
 
-# This first smoke test needs no shared libraries on an older TinkerOS.
+# Deploy a standalone executable without target-side C++ runtime dependencies.
 if(CMAKE_CROSSCOMPILING)
   target_link_options(family-dashboard PRIVATE -static)
 endif()
