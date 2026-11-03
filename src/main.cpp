@@ -6,6 +6,7 @@
 import dashboard.greeting;
 import dashboard.framebuffer;
 import dashboard.display;
+import dashboard.layout;
 
 using namespace std;
 
@@ -22,19 +23,36 @@ int main(int argc, char **argv)
       dashboard::test_image().write_pbm(argv[2]);
       println("Wrote 800x480 preview to {}", argv[2]);
     }
-    else if (argc == 2 && string_view(argv[1]) == "--display")
+    else if (argc == 3 && (string_view(argv[1]) == "--preview-morning" ||
+                           string_view(argv[1]) == "--preview-afternoon"))
+    {
+      dashboard::sample_dashboard(string_view(argv[1]) == "--preview-afternoon")
+          .write_pbm(argv[2]);
+      println("Wrote 800x480 sample dashboard to {}", argv[2]);
+    }
+    else if (argc == 2 && (string_view(argv[1]) == "--display" ||
+                           string_view(argv[1]) == "--display-morning" ||
+                           string_view(argv[1]) == "--display-afternoon"))
     {
       println("Refreshing Waveshare 7.5-inch V2 (800x480)...");
       if (fflush(stdout) != 0)
       {
         return 1;
       }
-      dashboard::show_on_display(dashboard::test_image());
+      const auto option = string_view(argv[1]);
+      dashboard::show_on_display(
+          option == "--display"
+              ? dashboard::test_image()
+              : dashboard::sample_dashboard(option == "--display-afternoon"));
       println("Refresh finished; display is asleep.");
     }
     else
     {
-      println(stderr, "Usage: {} [--preview image.pbm | --display]", argv[0]);
+      println(stderr,
+              "Usage: {} [--preview image.pbm | --preview-morning image.pbm | "
+              "--preview-afternoon image.pbm | "
+              "--display | --display-morning | --display-afternoon]",
+              argv[0]);
       return 2;
     }
     return fflush(stdout) == 0 ? 0 : 1;

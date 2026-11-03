@@ -8,7 +8,7 @@ target_compile_features(family-dashboard PRIVATE cxx_std_26)
 set_target_properties(family-dashboard PROPERTIES CXX_EXTENSIONS OFF)
 target_sources(family-dashboard PRIVATE
   FILE_SET CXX_MODULES FILES
-    src/greeting.cppm src/framebuffer.cppm src/display.cppm)
+    src/greeting.cppm src/framebuffer.cppm src/display.cppm src/layout.cppm)
 
 # This first smoke test needs no shared libraries on an older TinkerOS.
 if(CMAKE_CROSSCOMPILING)

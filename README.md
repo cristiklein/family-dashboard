@@ -92,6 +92,39 @@ sips -s format png build/display-preview.pbm --out build/display-preview.png
 
 ## Text rendering
 
+### Dashboard layout experiment
+
+Generate morning and afternoon layouts at the panel's exact 800x480 resolution:
+
+```sh
+build/macos/family-dashboard --preview-morning build/morning.pbm
+build/macos/family-dashboard --preview-afternoon build/afternoon.pbm
+sips -s format png build/morning.pbm --out build/morning.png
+sips -s format png build/afternoon.pbm --out build/afternoon.png
+```
+
+These previews use fixed fictional sample data: today's timeline and weather
+in the morning, tomorrow's timeline in the afternoon, plus countdowns,
+household reminders, and shopping in both. They do not fetch live data or
+switch modes automatically. To try them on the physical panel, build and upload
+the executable, then select a layout:
+
+```sh
+bash scripts/build.sh
+bash scripts/deploy.sh
+bash scripts/display.sh --morning
+bash scripts/display.sh --afternoon
+```
+
+The display script also accepts an SSH target, for example
+`bash scripts/display.sh linaro@tinkerboard.local --morning`.
+The executable provides `--display-morning` and `--display-afternoon` for direct
+use on the board. The existing `--preview`, `--display`, and display script
+without a mode continue to use the hardware test image (`--test` selects it
+explicitly).
+
+### Font coverage
+
 The built-in 5x7 font covers printable ASCII (uppercase, lowercase, numbers,
 and punctuation), `ÅÄÖåäö`, `Éé`, the degree sign, euro sign, typographic quotes,
 dashes, ellipsis, and bullet. Text is decoded as UTF-8 and centered by character

@@ -346,12 +346,9 @@ u32string decode_utf8(string_view text)
 export namespace dashboard
 {
 
-void centered_text(dashboard::mono_image &image, string_view text, int y,
-                   int scale)
+void draw_text(mono_image &image, string_view text, int x, int y, int scale)
 {
   const auto letters = decode_utf8(text);
-  int x =
-      (image.width - (static_cast<int>(letters.size()) * 6 - 1) * scale) / 2;
   for (char32_t letter : letters)
   {
     const auto rows = glyph(letter);
@@ -367,6 +364,12 @@ void centered_text(dashboard::mono_image &image, string_view text, int y,
     }
     x += 6 * scale;
   }
+}
+
+void centered_text(mono_image &image, string_view text, int y, int scale)
+{
+  const auto count = static_cast<int>(decode_utf8(text).size());
+  draw_text(image, text, (image.width - (count * 6 - 1) * scale) / 2, y, scale);
 }
 
 mono_image test_image()
