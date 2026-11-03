@@ -34,4 +34,13 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     FILE_SET CXX_MODULES FILES src/framebuffer.cppm)
   add_dependencies(framebuffer-test format-check)
   add_test(NAME framebuffer COMMAND framebuffer-test)
+
+  add_executable(layout-test tests/layout_test.cpp)
+  target_compile_features(layout-test PRIVATE cxx_std_26)
+  set_target_properties(layout-test PROPERTIES CXX_EXTENSIONS OFF)
+  target_sources(layout-test PRIVATE
+    FILE_SET CXX_MODULES FILES src/framebuffer.cppm src/layout.cppm)
+  add_dependencies(layout-test format-check)
+  add_test(NAME layout COMMAND layout-test)
+  set_tests_properties(layout PROPERTIES ENVIRONMENT "TZ=UTC")
 endif()

@@ -1,5 +1,9 @@
 module;
 
+#include <chrono>
+#include <ctime>
+#include <format>
+#include <stdexcept>
 #include <string_view>
 
 export module dashboard.layout;
@@ -33,12 +37,23 @@ void checkbox(dashboard::mono_image &image, int x, int y, string_view label)
 export namespace dashboard
 {
 
-// Deliberately fixed sample data: these are layout experiments, not live feeds.
-mono_image sample_dashboard(bool afternoon)
+// The clock is live; the remaining content is fixed fictional sample data.
+// Accept a time explicitly so layout tests can render reproducible images.
+mono_image sample_dashboard(
+    bool afternoon,
+    chrono::system_clock::time_point now = chrono::system_clock::now())
 {
+  const auto timestamp = chrono::system_clock::to_time_t(now);
+  tm local{};
+  if (localtime_r(&timestamp, &local) == nullptr)
+  {
+    throw runtime_error("Cannot determine local time for dashboard clock");
+  }
   mono_image image;
   draw_text(image, afternoon ? "Good afternoon!" : "Good morning!", 24, 20, 4);
-  draw_text(image, "MON 02 NOV", 590, 28, 2);
+  draw_text(image, format("{:02}:{:02}", local.tm_hour, local.tm_min), 660, 12,
+            4);
+  draw_text(image, "MON 02 NOV", 658, 46, 2);
   image.rectangle(24, 66, 752, 2);
 
   draw_text(image, afternoon ? "TOMORROW / TUE 03" : "TODAY / MON 02", 24, 90,

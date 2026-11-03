@@ -102,7 +102,26 @@ Panel register settings are adapted from
 [Waveshare's reference driver](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_7in5_V2.c);
 its license is in `third_party/Waveshare-LICENSE.txt`.
 
-To preview the exact framebuffer on macOS without accessing GPIO:
+For a browser preview that updates automatically while you edit:
+
+```sh
+bash scripts/preview.sh
+```
+
+This opens a local viewer at `http://127.0.0.1:8765/`. Choose morning, afternoon,
+or the hardware test image. Saving source files triggers a native rebuild and
+regenerates the images; the browser updates without clicking or refocusing it.
+The layout clocks also advance automatically every minute without rebuilding.
+The viewer builds in `build/preview/native`, separately from `build/macos`.
+Restart the preview script after updating the watcher itself.
+If a build fails, the last successful image stays visible and the error is
+printed in the terminal. Stop the watcher with Ctrl+C. The viewer binds only to
+your Mac's loopback interface and uses Python's standard library plus the
+existing CMake/Clang build and macOS `sips` image converter. Use `--no-open` to
+skip opening a browser, or `--port 8766` to choose another port. `LLVM_ROOT` and
+`PYTHON` work as with the build script.
+
+To generate a single preview file instead:
 
 ```sh
 cmake -S . -B build/macos -G Ninja \
@@ -125,7 +144,12 @@ sips -s format png build/morning.pbm --out build/morning.png
 sips -s format png build/afternoon.pbm --out build/afternoon.png
 ```
 
-These previews use fixed fictional sample data: today's timeline and weather
+Both layouts show a 24-hour clock (HH:MM) using the machine's local timezone.
+The browser preview advances it each minute; a physical display command draws
+the time at invocation and still needs scheduling for ongoing minute updates.
+On the Pi, set the timezone to `Europe/Stockholm` with `sudo raspi-config` if needed.
+
+The remaining content uses fixed fictional sample data: today's timeline and weather
 in the morning, tomorrow's timeline in the afternoon, plus countdowns,
 household reminders, and shopping in both. They do not fetch live data or
 switch modes automatically. To try them on the physical panel, build and upload
@@ -285,7 +309,8 @@ cmake --build build/macos
 ctest --test-dir build/macos --output-on-failure
 ```
 
-Native tests exercise framebuffer and UTF-8 rendering. The ARM64 build compiles
+Native tests exercise framebuffer and UTF-8 rendering, minute updates, and
+midnight rollover. The ARM64 build compiles
 the Linux SPI and GPIO code but does not exercise hardware. After deployment,
 run the greeting and generate a preview on the Pi before testing the HAT. Start
 with `--test --full`, then validate morning/afternoon layouts, fast refresh,
