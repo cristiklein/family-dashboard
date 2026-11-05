@@ -279,8 +279,8 @@ display script.
 Normal display commands now also attempt standalone partial updates after waking
 from deep sleep, using the retained visible image without restoring controller
 RAM. This wake-up behavior and all refresh modes still need verification on
-the Zero 2 W. Ghosting may accumulate during this experiment. No full or fast refresh is triggered automatically, even
-after an error. If desired, explicitly use
+the Zero 2 W. Ghosting may accumulate during this experiment. Individual display
+commands do not trigger a cleaning refresh automatically after an error. Use
 `bash scripts/display.sh --afternoon --full` for a cleaning refresh.
 
 ### Font coverage
@@ -387,3 +387,18 @@ run the greeting and generate a preview on the Pi before testing the HAT. Start
 with `--test --full`, then validate morning/afternoon layouts, fast refresh,
 and partial refresh on the physical panel. The Zero hardware path is not yet
 verified.
+
+### Hourly cleaning refresh
+
+The morning timer updates the display each minute, using a full refresh at
+minute `00` of every hour and partial refreshes during the other minutes.
+To install or update it, copy both scripts to the Pi and run:
+
+```sh
+scp scripts/install-morning-timer.sh scripts/refresh-morning.sh your-user@zero.local:~
+ssh -t your-user@zero.local 'bash ~/install-morning-timer.sh'
+```
+
+The installer deploys the refresh script beside the existing dashboard binary
+and restarts the timer. Full refreshes may flash the panel. Missed updates while
+the Pi is off are skipped; the next full refresh runs at the next hour boundary.

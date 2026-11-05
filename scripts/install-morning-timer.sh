@@ -16,6 +16,10 @@ binary="$dashboard_home/.local/bin/family-dashboard"
   exit 1
 }
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+refresh_script="$dashboard_home/.local/bin/family-dashboard-refresh"
+install -o "$dashboard_user" -m 755 "$script_dir/refresh-morning.sh" "$refresh_script"
+
 stage_dir="$(mktemp -d)"
 trap 'rm -rf "$stage_dir"' EXIT
 
@@ -28,7 +32,7 @@ Type=oneshot
 User=$dashboard_user
 SupplementaryGroups=spi gpio
 Environment=TZ=Europe/Stockholm
-ExecStart="$binary" --display-morning --partial
+ExecStart="$refresh_script"
 EOF
 
 cat > "$stage_dir/family-dashboard.timer" <<'EOF'
@@ -54,6 +58,6 @@ systemctl restart family-dashboard.timer
 systemctl list-timers family-dashboard.timer --no-pager
 
 printf '\nMorning layout scheduled at each minute boundary, including after reboot.\n'
-printf 'The panel takes additional time to complete each partial refresh.\n'
+printf 'A full refresh runs at the start of each hour; other minutes use partial refresh.\n'
 printf 'Logs: sudo journalctl -u family-dashboard.service -f\n'
 printf 'Stop: sudo systemctl disable --now family-dashboard.timer\n'
