@@ -10,11 +10,18 @@
 
 import dashboard.framebuffer;
 import dashboard.layout;
+import dashboard.config;
 
 using namespace std;
 
 namespace
 {
+
+const dashboard::configuration config{
+    {{"a", "Alex"}, {"b", "Sam"}, {"c", "Charlie"}, {"d", "Robin"}},
+    {},
+    {},
+    {}};
 
 void require(bool condition, string_view message)
 {
@@ -79,8 +86,8 @@ void test_dates()
   const auto check =
       [](auto now, string_view header, string_view today, string_view tomorrow)
   {
-    const auto morning = dashboard::sample_dashboard(false, now);
-    const auto afternoon = dashboard::sample_dashboard(true, now);
+    const auto morning = dashboard::configured_dashboard(config, false, now);
+    const auto afternoon = dashboard::configured_dashboard(config, true, now);
     require_label(morning, header, 658, 46, 2);
     require_label(afternoon, header, 658, 46, 2);
     require_label(morning, today, 24, 90, 3);
@@ -109,17 +116,54 @@ void test_dates()
         "TOMORROW / THU 05");
 }
 
+void test_configured_content()
+{
+  auto plans = config;
+  plans.weekly[2]["a"] = "Office";
+  const auto today = dashboard::parse_date("2026-11-04");
+  plans.deviations[today + chrono::days{1}]["a"] = "Day off";
+  plans.good_things = {{today - chrono::days{1}, "Past"},
+                       {today, "Movie night"},
+                       {today + chrono::days{1}, "Swimming"}};
+  const auto now = local_time(2026, 11, 4);
+  const auto morning = dashboard::configured_dashboard(plans, false, now);
+  const auto afternoon = dashboard::configured_dashboard(plans, true, now);
+  require_label(morning, "Alex", 24, 130, 3);
+  require_label(morning, "Office", 24, 155, 2);
+  require_label(afternoon, "Alex *", 24, 130, 3);
+  require_label(afternoon, "Day off", 24, 155, 2);
+  for (const auto *image : {&morning, &afternoon})
+  {
+    require_label(*image, "Today!", 532, 130, 3);
+    require_label(*image, "Movie night", 532, 157, 2);
+    require_label(*image, "1 day", 532, 206, 3);
+    require_label(*image, "Swimming", 532, 233, 2);
+  }
+  // Long words and UTF-8 summaries must stay inside their column.
+  plans.weekly[2]["a"] = string(100, 'X') + " ÅÄÖåäö";
+  const auto long_text = dashboard::configured_dashboard(plans, false, now);
+  for (int y = 155; y < 187; ++y)
+  {
+    for (int x = 480; x < 506; ++x)
+    {
+      require(!black(long_text, x, y),
+              "Long text must not cross the schedule column");
+    }
+  }
+}
+
 void test_clock(bool afternoon)
 {
   using namespace chrono;
   const auto start = local_time(2026, 11, 3);
-  const auto first = dashboard::sample_dashboard(afternoon, start);
+  const auto first = dashboard::configured_dashboard(config, afternoon, start);
   require_clock(first, "07:09");
-  require(
-      first.pixels ==
-          dashboard::sample_dashboard(afternoon, start + seconds(59)).pixels,
-      "Seconds must not change the rendered layout");
-  const auto next = dashboard::sample_dashboard(afternoon, start + minutes(1));
+  require(first.pixels == dashboard::configured_dashboard(config, afternoon,
+                                                          start + seconds(59))
+                              .pixels,
+          "Seconds must not change the rendered layout");
+  const auto next =
+      dashboard::configured_dashboard(config, afternoon, start + minutes(1));
   require_clock(next, "07:10");
   require(first.pixels != next.pixels, "A new minute must change the image");
   for (int y = 0; y < first.height; ++y)
@@ -133,12 +177,12 @@ void test_clock(bool afternoon)
       }
     }
   }
-  require_clock(
-      dashboard::sample_dashboard(afternoon, local_time(2026, 11, 3, 23, 59)),
-      "23:59");
-  require_clock(
-      dashboard::sample_dashboard(afternoon, local_time(2026, 11, 4, 0, 0)),
-      "00:00");
+  require_clock(dashboard::configured_dashboard(
+                    config, afternoon, local_time(2026, 11, 3, 23, 59)),
+                "23:59");
+  require_clock(dashboard::configured_dashboard(config, afternoon,
+                                                local_time(2026, 11, 4, 0, 0)),
+                "00:00");
 }
 
 } // namespace
@@ -150,6 +194,7 @@ int main()
     test_clock(false);
     test_clock(true);
     test_dates();
+    test_configured_content();
     return 0;
   }
   catch (const exception &error)

@@ -1,0 +1,57 @@
+# Copy to dashboard.yaml and replace these fictional names and plans.
+# Members appear in this order. Keep exactly four.
+members:
+  - id: alex
+    name: Alex
+  - id: sam
+    name: Sam
+  - id: charlie
+    name: Charlie
+  - id: robin
+    name: Robin
+
+# High-level summaries; omitted people show "No plans".
+weekly:
+  monday:
+    alex: "Office; home at 17"
+    sam: "Work from home; pickup"
+    charlie: "School; football at 17"
+    robin: "Preschool; bring rainwear"
+  tuesday:
+    alex: "Work from home; pickup"
+    sam: "Office; home at 18"
+    charlie: "School; bring library books"
+    robin: "Preschool"
+  wednesday:
+    alex: "Office; home at 17"
+    sam: "Work from home; pickup"
+    charlie: "School; swimming at 17"
+    robin: "Preschool; forest outing"
+  thursday:
+    alex: "Work from home; pickup"
+    sam: "Office; home at 18"
+    charlie: "School; PE kit"
+    robin: "Preschool"
+  friday:
+    alex: "Office; home early"
+    sam: "Work from home; pickup"
+    charlie: "School"
+    robin: "Preschool"
+  saturday:
+    charlie: "Football at 10"
+  sunday: {}
+
+# Replace the full summary for this person on this exact date.
+deviations:
+  "2026-11-05":
+    sam: "Away overnight; Alex picks up"
+    charlie: "School closed; at home"
+
+# Past entries disappear; multiple entries may share a date.
+good-things:
+  - date: "2026-11-06"
+    title: Movie night
+  - date: "2026-11-14"
+    title: Visit Grandma
+  - date: "2026-12-20"
+    title: Winter holiday

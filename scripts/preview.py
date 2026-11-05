@@ -21,7 +21,8 @@ LAYOUTS = ("morning", "afternoon", "test")
 
 def source_signature():
     paths = {PROJECT / "CMakeLists.txt", PROJECT / ".clang-format",
-             PROJECT / "scripts/format.sh"}
+             PROJECT / "scripts/format.sh", PROJECT / "dashboard.example.yaml",
+             PROJECT / "dashboard.yaml"}
     for folder in ("src", "tests", "cmake"):
         paths.update(path for path in (PROJECT / folder).rglob("*") if path.is_file())
     signature = []
@@ -86,7 +87,11 @@ def main():
                         pbm = OUTPUT / f"{layout}.pbm"
                         png = OUTPUT / f"{layout}.png"
                         option = "--preview" if layout == "test" else f"--preview-{layout}"
-                        run([str(BUILD / "family-dashboard"), option, str(pbm)])
+                        config = PROJECT / "dashboard.yaml"
+                        if not config.exists():
+                            config = PROJECT / "dashboard.example.yaml"
+                        run([str(BUILD / "family-dashboard"), option, str(pbm),
+                             "--config", str(config)])
                         run(["sips", "-s", "format", "png", str(pbm), "--out", str(png)], quiet=True)
                         updated[layout] = png.read_bytes()
                     with lock:

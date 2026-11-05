@@ -10,6 +10,7 @@ Install the native build tools with Homebrew:
 
 ```sh
 brew install llvm lld cmake ninja python@3.14
+cp dashboard.example.yaml dashboard.yaml # Edit names and plans before deploying.
 bash scripts/build.sh
 bash scripts/deploy.sh
 ```
@@ -36,6 +37,73 @@ bash scripts/deploy.sh your-user@zero.local
 
 SSH uses your normal keys or interactive password prompt. Passwords are not
 stored in this repository.
+
+## Dashboard configuration
+
+The dashboard reads a hand-maintained UTF-8 YAML file. Start with the fictional
+example, then replace the names and plans:
+
+```sh
+cp dashboard.example.yaml dashboard.yaml
+```
+
+`dashboard.yaml` is ignored by Git. The three kinds of content are:
+
+- **Weekly schedule:** `members` lists exactly four people with `id` and `name`,
+  in display order. `weekly` maps weekdays (`monday` through `sunday`) to member
+  IDs and high-level summaries. Omitted entries show `No plans`.
+- **Deviations:** `deviations` maps exact dates to member summaries that replace
+  their usual plans for that day. Everyone else keeps their weekly schedule.
+  Use text such as `Day off` to cancel recurring plans. Changed people have a
+  `*` beside their name on the display.
+- **Good things ahead:** `good-things` lists entries with `date` and `title`.
+  Entries are sorted by date; past entries disappear, and the next three show
+  calendar-day countdowns from today in both layouts. Multiple entries may
+  share a date.
+
+For example, after defining your four members:
+
+```yaml
+weekly:
+  monday:
+    alex: "Office; home at 17"
+deviations:
+  "2026-11-05":
+    alex: "Day off"
+good-things:
+  - date: "2026-11-06"
+    title: "Movie night"
+```
+
+Dates must be `YYYY-MM-DD`. Standard YAML quoting, inline comments, and folded
+text (`>-`) are supported. Quote text containing `: ` or ` #` so it is read as
+text. Duplicate keys or member IDs, unknown fields or members, invalid dates,
+and empty or non-text summaries are rejected. Keep summaries short: the panel
+wraps them into two lines and uses `...` beyond the available space.
+
+The build downloads [yaml-cpp 0.8.0](https://github.com/jbeder/yaml-cpp/tree/0.8.0),
+checks its SHA256 hash, and links it statically for both targets. No YAML runtime
+package is needed on the Pi. CMake caches the source in each build directory;
+`build/dependencies/yaml-cpp-0.8.0.tar.gz`, if present, is used as a local archive
+with the same hash check.
+
+The executable reads `dashboard.yaml` in the current directory, falling back to
+`~/.config/family-dashboard/dashboard.yaml` if no local file exists. Override
+this with `--config /path/to/plans.yaml` on any dashboard command. Missing or
+invalid configuration produces an error before touching the display.
+
+The live preview watches `dashboard.yaml` and reloads it when saved; it uses
+`dashboard.example.yaml` until you create your own file. Deployment uploads your
+local `dashboard.yaml` to `~/.config/family-dashboard/dashboard.yaml` on the Pi.
+An optional second deploy argument selects another local configuration file:
+
+```sh
+bash scripts/deploy.sh your-user@zero.local /path/to/plans.yaml
+```
+
+After editing plans, deploy again to update the Pi. Configuration changes do not
+require recompilation. Existing display commands and the morning timer read the
+file each time they run.
 
 ## Display test
 
@@ -109,8 +177,8 @@ bash scripts/preview.sh
 ```
 
 This opens a local viewer at `http://127.0.0.1:8765/`. Choose morning, afternoon,
-or the hardware test image. Saving source files triggers a native rebuild and
-regenerates the images; the browser updates without clicking or refocusing it.
+or the hardware test image. Saving source files or the configuration updates
+the images; the browser updates without clicking or refocusing it.
 The layout clocks also advance automatically every minute without rebuilding.
 The viewer builds in `build/preview/native`, separately from `build/macos`.
 Restart the preview script after updating the watcher itself.
@@ -152,11 +220,10 @@ The browser preview advances it each minute; a physical display command draws
 the time at invocation and still needs scheduling for ongoing minute updates.
 On the Pi, set the timezone to `Europe/Stockholm` with `sudo raspi-config` if needed.
 
-The remaining content uses fixed fictional sample data: today's timeline and weather
-in the morning, tomorrow's timeline in the afternoon, plus countdowns,
-household reminders, and shopping in both. They do not fetch live data or
-switch modes automatically. To try them on the physical panel, build and upload
-the executable, then select a layout:
+Both layouts use your configured family summaries, dated deviations, and good
+things ahead. They do not fetch external data or switch modes automatically.
+To try them on the physical panel, build and upload the executable and your
+configuration, then select a layout:
 
 ```sh
 bash scripts/build.sh
@@ -312,8 +379,9 @@ cmake --build build/macos
 ctest --test-dir build/macos --output-on-failure
 ```
 
-Native tests exercise framebuffer and UTF-8 rendering, minute updates, and
-midnight rollover. The ARM64 build compiles
+Native tests exercise configuration validation, weekly schedules, dated
+overrides, countdown rendering, framebuffer and UTF-8 rendering, minute
+updates, and midnight rollover. The ARM64 build compiles
 the Linux SPI and GPIO code but does not exercise hardware. After deployment,
 run the greeting and generate a preview on the Pi before testing the HAT. Start
 with `--test --full`, then validate morning/afternoon layouts, fast refresh,

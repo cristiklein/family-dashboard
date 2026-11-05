@@ -7,10 +7,12 @@ module;
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 export module dashboard.layout;
 
 import dashboard.framebuffer;
+import dashboard.config;
 
 using namespace std;
 
@@ -34,21 +36,63 @@ string date_label(chrono::sys_days date, bool include_month)
              : label;
 }
 
-void event(dashboard::mono_image &image, int y, string_view time,
-           string_view title, string_view detail)
+// Count UTF-8 characters so Swedish names do not wrap by byte count.
+size_t text_length(string_view text)
 {
-  dashboard::draw_text(image, time, 24, y + 3, 2);
-  dashboard::draw_text(image, title, 110, y, 3);
-  dashboard::draw_text(image, detail, 110, y + 28, 2);
+  size_t count = 0;
+  for (unsigned char byte : text)
+  {
+    if ((byte & 0xc0) != 0x80)
+    {
+      ++count;
+    }
+  }
+  return count;
 }
 
-void checkbox(dashboard::mono_image &image, int x, int y, string_view label)
+string take_text(string_view text, size_t count)
 {
-  image.rectangle(x, y, 14, 2);
-  image.rectangle(x, y + 12, 14, 2);
-  image.rectangle(x, y, 2, 14);
-  image.rectangle(x + 12, y, 2, 14);
-  dashboard::draw_text(image, label, x + 24, y, 2);
+  size_t end = 0;
+  size_t seen = 0;
+  while (end < text.size())
+  {
+    if ((static_cast<unsigned char>(text[end]) & 0xc0) != 0x80 &&
+        seen++ == count)
+    {
+      break;
+    }
+    ++end;
+  }
+  return string(text.substr(0, end));
+}
+
+void wrapped_text(dashboard::mono_image &image, string text, int x, int y,
+                  size_t columns, int lines)
+{
+  for (int line = 0; line < lines && !text.empty(); ++line)
+  {
+    if (text_length(text) <= columns)
+    {
+      dashboard::draw_text(image, text, x, y + line * 18, 2);
+      return;
+    }
+    if (line == lines - 1)
+    {
+      dashboard::draw_text(image, take_text(text, columns - 3) + "...", x,
+                           y + line * 18, 2);
+      return;
+    }
+    auto part = take_text(text, columns);
+    const auto space = part.find_last_of(' ');
+    if (space != string::npos && space > 0)
+    {
+      part.resize(space);
+    }
+    dashboard::draw_text(image, part, x, y + line * 18, 2);
+    text.erase(0, part.size());
+    const auto start = text.find_first_not_of(' ');
+    text = start == string::npos ? "" : text.substr(start);
+  }
 }
 
 } // namespace
@@ -56,10 +100,9 @@ void checkbox(dashboard::mono_image &image, int x, int y, string_view label)
 export namespace dashboard
 {
 
-// The clock and date labels are live; other content is fictional sample data.
 // Accept a time explicitly so layout tests can render reproducible images.
-mono_image sample_dashboard(
-    bool afternoon,
+mono_image configured_dashboard(
+    const configuration &config, bool afternoon,
     chrono::system_clock::time_point now = chrono::system_clock::now())
 {
   const auto timestamp = chrono::system_clock::to_time_t(now);
@@ -87,43 +130,59 @@ mono_image sample_dashboard(
             24, 90, 3);
   image.rectangle(506, 90, 2, 262);
 
-  if (afternoon)
+  const auto summaries = schedule_for(config, agenda_day);
+  bool changed = false;
+  for (size_t i = 0; i < summaries.size(); ++i)
   {
-    event(image, 134, "08:15", "School", "Bring library books");
-    event(image, 190, "15:30", "School pickup", "Dad picks up");
-    event(image, 246, "17:00", "Swimming", "Pack towel + goggles");
-    event(image, 302, "18:30", "Family dinner", "Everyone at home");
-  }
-  else
-  {
-    event(image, 134, "08:15", "School", "PE kit + water bottle");
-    event(image, 190, "15:30", "School pickup", "Mum picks up");
-    event(image, 246, "17:00", "Football", "North pitch");
-    event(image, 302, "18:30", "Family dinner", "Pasta night");
-
-    draw_text(image, "WEATHER", 532, 90, 2);
-    draw_text(image, "7°C", 532, 116, 5);
-    draw_text(image, "Rain after lunch", 532, 164, 2);
-    draw_text(image, "Bring waterproofs", 532, 188, 2);
-    image.rectangle(532, 218, 244, 1);
+    const auto &item = summaries[i];
+    const int y = 130 + static_cast<int>(i) * 60;
+    const size_t name_limit = item.changed ? 24 : 26;
+    const auto name = text_length(item.name) > name_limit
+                          ? take_text(item.name, name_limit - 3) + "..."
+                          : item.name;
+    draw_text(image, name + (item.changed ? " *" : ""), 24, y, 3);
+    wrapped_text(image, item.summary, 24, y + 25, 38, 2);
+    changed = changed || item.changed;
   }
 
-  const int countdown_y = afternoon ? 100 : 238;
-  draw_text(image, "GOOD THINGS AHEAD", 532, countdown_y, 2);
-  draw_text(image, "4", 532, countdown_y + 30, afternoon ? 8 : 5);
-  draw_text(image, "days to", 594, countdown_y + 34, 2);
-  draw_text(image, "Movie night", 594, countdown_y + 56, 2);
-  draw_text(image, "12 days: Grandma", 532, afternoon ? 270 : 326, 2);
+  draw_text(image, "GOOD THINGS AHEAD", 532, 90, 2);
+  size_t shown = 0;
+  size_t upcoming = 0;
+  for (const auto &thing : config.good_things)
+  {
+    if (thing.date < today)
+    {
+      continue;
+    }
+    ++upcoming;
+    if (shown >= 3)
+    {
+      continue;
+    }
+    const int y = 130 + static_cast<int>(shown) * 76;
+    const auto days = (thing.date - today).count();
+    draw_text(image,
+              days == 0 ? "Today!"
+                        : format("{} {}", days, days == 1 ? "day" : "days"),
+              532, y, 3);
+    wrapped_text(image, thing.title, 532, y + 27, 20, 2);
+    ++shown;
+  }
+  if (upcoming == 0)
+  {
+    wrapped_text(image, "Nothing planned yet", 532, 134, 20, 2);
+  }
+  if (upcoming > shown)
+  {
+    draw_text(image, format("+{} more ahead", upcoming - shown), 532, 362, 2);
+  }
 
-  image.rectangle(24, 372, 752, 2);
-  draw_text(image, "REMINDERS", 24, 394, 2);
-  checkbox(image, 24, 426, "Put bins out tonight");
-  image.rectangle(360, 394, 1, 62);
-  draw_text(image, "SHOPPING", 386, 394, 2);
-  checkbox(image, 386, 426, "Milk");
-  checkbox(image, 506, 426, "Bread");
-  checkbox(image, 638, 426, "Apples");
-  draw_text(image, "SAMPLE", 706, 464, 1);
+  image.rectangle(24, 400, 752, 2);
+  draw_text(image, "DEVIATIONS", 24, 422, 2);
+  draw_text(image,
+            changed ? "* Changed from the usual weekly schedule"
+                    : "Following the usual weekly schedule",
+            24, 450, 2);
   return image;
 }
 
