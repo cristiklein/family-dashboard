@@ -36,16 +36,6 @@ if(CMAKE_CROSSCOMPILING)
   target_link_options(family-dashboard PRIVATE -static)
 endif()
 
-add_custom_target(format
-  COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/format.sh"
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-  COMMENT "Format C++ sources using Allman braces")
-add_custom_target(format-check
-  COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/format.sh" --check
-  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-  COMMENT "Check C++ formatting")
-add_dependencies(family-dashboard format-check)
-
 include(CTest)
 if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
   add_executable(framebuffer-test tests/framebuffer_test.cpp)
@@ -53,7 +43,6 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
   set_target_properties(framebuffer-test PROPERTIES CXX_EXTENSIONS OFF)
   target_sources(framebuffer-test PRIVATE
     FILE_SET CXX_MODULES FILES src/framebuffer.cppm)
-  add_dependencies(framebuffer-test format-check)
   add_test(NAME framebuffer COMMAND framebuffer-test)
 
   add_executable(config-test tests/config_test.cpp)
@@ -62,7 +51,6 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
   set_target_properties(config-test PROPERTIES CXX_EXTENSIONS OFF)
   target_sources(config-test PRIVATE
     FILE_SET CXX_MODULES FILES src/config.cppm)
-  add_dependencies(config-test format-check)
   add_test(NAME config COMMAND config-test)
 
   add_executable(layout-test tests/layout_test.cpp)
@@ -71,7 +59,6 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
   set_target_properties(layout-test PROPERTIES CXX_EXTENSIONS OFF)
   target_sources(layout-test PRIVATE
     FILE_SET CXX_MODULES FILES src/framebuffer.cppm src/config.cppm src/layout.cppm)
-  add_dependencies(layout-test format-check)
   add_test(NAME layout COMMAND layout-test)
   set_tests_properties(layout PROPERTIES ENVIRONMENT "TZ=UTC")
   add_test(NAME layout-stockholm COMMAND layout-test)

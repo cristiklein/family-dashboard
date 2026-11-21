@@ -340,15 +340,26 @@ for coding agents. Editors with clang-format support can use the same config.
 Source files use `using namespace std;` with unqualified standard-library names;
 module units place the directive after their module declaration and imports.
 
+Install [pre-commit](https://pre-commit.com/#installation) and enable the hook
+once per clone:
+
 ```sh
-bash scripts/format.sh          # Format all C++ sources and modules
-bash scripts/format.sh --check  # Fail if formatting differs
+brew install pre-commit
+pre-commit install
 ```
 
-The configured CMake build also provides `format` and `format-check` targets.
-Building the executable automatically runs `format-check` and fails on drift.
-The script uses the system's `find` and clang-format from the LLVM installation.
-Set `CLANG_FORMAT` to select a different formatter executable.
+Pre-commit installs the pinned clang-format hook and checks staged C++ sources,
+headers, and modules using `.clang-format`. To apply fixes and verify the
+result for all tracked C++ files:
+
+```sh
+pre-commit run clang-format-fix --hook-stage manual --all-files
+pre-commit run clang-format --all-files
+```
+
+Pre-commit reports when the fix command rewrites tracked files. Use `--files`
+followed by paths to format or check specific files, including new untracked
+files.
 
 ## Toolchain and compatibility
 
@@ -372,7 +383,7 @@ refresh target packages.
 Before deployment, run:
 
 ```sh
-bash scripts/format.sh --check
+pre-commit run clang-format --all-files
 bash scripts/build.sh
 cmake -S . -B build/macos -G Ninja \
   -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++"

@@ -20,8 +20,7 @@ LAYOUTS = ("morning", "afternoon", "test")
 
 
 def source_signature():
-    paths = {PROJECT / "CMakeLists.txt", PROJECT / ".clang-format",
-             PROJECT / "scripts/format.sh", PROJECT / "dashboard.example.yaml",
+    paths = {PROJECT / "CMakeLists.txt", PROJECT / "dashboard.example.yaml",
              PROJECT / "dashboard.yaml"}
     for folder in ("src", "tests", "cmake"):
         paths.update(path for path in (PROJECT / folder).rglob("*") if path.is_file())
