@@ -54,7 +54,7 @@ systemctl restart family-dashboard.timer
 systemctl list-timers family-dashboard.timer --no-pager
 
 printf '\nDashboard scheduled at each minute boundary, including after reboot.\n'
-printf 'The dashboard shows tomorrow’s plans from 17:00 until midnight (Stockholm time).\n'
+printf "The dashboard shows tomorrow’s plans from 17:00 until midnight (Stockholm time).\n"
 printf 'A full refresh runs at the start of each hour; other minutes use partial refresh.\n'
 printf 'Logs: sudo journalctl -u family-dashboard.service -f\n'
 printf 'Stop: sudo systemctl disable --now family-dashboard.timer\n'
