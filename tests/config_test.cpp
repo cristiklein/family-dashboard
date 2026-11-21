@@ -55,9 +55,16 @@ weekly:
   thursday:
     a: "Office; pickup = 17:00" # Inline comment
     b: 'Swimming'
+    c: ''
+    d: '   '
+  friday:
+    a:
+    b: null
 deviations:
   "2026-11-05":
     a: Day off
+  "2026-11-19":
+    a:
 good-things:
   - date: 2027-01-01
     title: New year
@@ -76,11 +83,19 @@ good-things:
             "Deviation must replace a member's usual schedule");
     require(!changed[1].changed && changed[1].summary == "Swimming",
             "Deviation must leave other members' schedules intact");
-    require(changed[2].summary == "No plans",
-            "Missing weekday summary needs a fallback");
+    require(changed[2].summary == "No plans" &&
+                changed[3].summary == "No plans",
+            "Empty and whitespace-only weekly text must show No plans");
+    const auto friday = dashboard::schedule_for(config, day + chrono::days{1});
+    require(friday[0].summary == "No plans" && friday[1].summary == "No plans",
+            "Blank and null weekly entries must show No plans");
     const auto usual = dashboard::schedule_for(config, day + chrono::days{7});
     require(!usual[0].changed && usual[0].summary == "Office; pickup = 17:00",
             "Overrides must apply only to their exact date; text is literal");
+    const auto cleared =
+        dashboard::schedule_for(config, day + chrono::days{14});
+    require(cleared[0].changed && cleared[0].summary == "No plans",
+            "Blank deviation must clear the usual schedule");
     require(config.good_things[0].title == "Movie night",
             "Good things must be ordered by date");
     require(dashboard::schedule_for(config, day + chrono::days{3})[0].summary ==
@@ -95,9 +110,8 @@ good-things:
     rejects(members + "deviations: {2026-02-29: {a: Day off}}\n");
     rejects(members + "good-things: [{date: 2026-13-01, title: Holiday}]\n");
     rejects(members + "good-things: [{date: 2026-1-01, title: Holiday}]\n");
-    rejects(members + "weekly: {monday: {a: null}}\n");
     rejects(members + "weekly: {monday: {a: []}}\n");
-    rejects(members + "weekly: {monday: {a: '   '}}\n");
+    rejects(members + "weekly: {monday: {a: {plan: Office}}}\n");
     rejects(members + "weekly: [monday]\n");
     rejects(members + "weekly: {monday: [Office]}\n");
     rejects(members + "weekly: {}\nweekly: {}\n");

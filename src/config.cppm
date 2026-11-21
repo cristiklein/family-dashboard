@@ -22,14 +22,21 @@ using namespace std;
 namespace
 {
 
-string scalar_text(const YAML::Node &node, string_view context)
+constexpr char no_plans[] = "No plans";
+
+string scalar_text(const YAML::Node &node, string_view context,
+                   string_view empty_text = {})
 {
-  if (!node.IsScalar() || node.Scalar().empty() ||
-      node.Scalar().find_first_not_of(" \t\r\n") == string::npos)
+  if (node.IsScalar() &&
+      node.Scalar().find_first_not_of(" \t\r\n") != string::npos)
   {
-    throw runtime_error(string(context) + " must be nonempty text");
+    return node.Scalar();
   }
-  return node.Scalar();
+  if (!empty_text.empty() && (node.IsNull() || node.IsScalar()))
+  {
+    return string(empty_text);
+  }
+  throw runtime_error(string(context) + " must be nonempty text");
 }
 
 void mapping(const YAML::Node &node, string_view context)
@@ -69,7 +76,8 @@ map<string, string> summaries(const YAML::Node &node, string_view context)
   map<string, string> result;
   for (const auto &entry : node)
   {
-    result.emplace(entry.first.Scalar(), scalar_text(entry.second, context));
+    result.emplace(entry.first.Scalar(),
+                   scalar_text(entry.second, context, no_plans));
   }
   return result;
 }
@@ -145,7 +153,7 @@ vector<daily_summary> schedule_for(const configuration &config,
   {
     auto summary = weekly.find(member.id);
     daily_summary item{member.name,
-                       summary == weekly.end() ? "No plans" : summary->second,
+                       summary == weekly.end() ? no_plans : summary->second,
                        false};
     if (deviation != config.deviations.end())
     {

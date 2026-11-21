@@ -51,10 +51,10 @@ cp dashboard.example.yaml dashboard.yaml
 
 - **Weekly schedule:** `members` lists exactly four people with `id` and `name`,
   in display order. `weekly` maps weekdays (`monday` through `sunday`) to member
-  IDs and high-level summaries. Omitted entries show `No plans`.
+  IDs and high-level summaries. Blank or omitted entries show `No plans`.
 - **Deviations:** `deviations` maps exact dates to member summaries that replace
   their usual plans for that day. Everyone else keeps their weekly schedule.
-  Use text such as `Day off` to cancel recurring plans. Changed people have a
+  Leave a summary blank to show `No plans` for that date. Changed people have a
   `*` beside their name on the display.
 - **Good things ahead:** `good-things` lists entries with `date` and `title`.
   Entries are sorted by date; past entries disappear, and the next three show
@@ -78,8 +78,8 @@ good-things:
 Dates must be `YYYY-MM-DD`. Standard YAML quoting, inline comments, and folded
 text (`>-`) are supported. Quote text containing `: ` or ` #` so it is read as
 text. Duplicate keys or member IDs, unknown fields or members, invalid dates,
-and empty or non-text summaries are rejected. Keep summaries short: the panel
-wraps them into two lines and uses `...` beyond the available space.
+and summary values written as lists or mappings are rejected. Keep summaries
+short so they fit in the panel's two lines before it adds `...`.
 
 The build downloads [yaml-cpp 0.8.0](https://github.com/jbeder/yaml-cpp/tree/0.8.0),
 checks its SHA256 hash, and links it statically for both targets. No YAML runtime
