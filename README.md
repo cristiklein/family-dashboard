@@ -348,18 +348,10 @@ brew install pre-commit
 pre-commit install
 ```
 
-Pre-commit installs the pinned clang-format hook and checks staged C++ sources,
-headers, and modules using `.clang-format`. To apply fixes and verify the
-result for all tracked C++ files:
-
-```sh
-pre-commit run clang-format-fix --hook-stage manual --all-files
-pre-commit run clang-format --all-files
-```
-
-Pre-commit reports when the fix command rewrites tracked files. Use `--files`
-followed by paths to format or check specific files, including new untracked
-files.
+Clang-format applies `.clang-format` to staged C++ files. If it makes changes,
+stage the fixes and retry the commit. Yamllint checks YAML syntax, duplicate
+keys, and two-space indentation. The CLI and the hook both read `.yamllint`.
+ShellCheck checks shell scripts.
 
 ## Toolchain and compatibility
 
@@ -383,7 +375,6 @@ refresh target packages.
 Before deployment, run:
 
 ```sh
-pre-commit run clang-format --all-files
 bash scripts/build.sh
 cmake -S . -B build/macos -G Ninja \
   -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++"

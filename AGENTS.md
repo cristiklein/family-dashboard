@@ -7,9 +7,7 @@
   source files. In module units, place the directive after the module declaration
   and imports; do not export it. Qualify individual names if needed to resolve
   an ambiguity.
-- After editing C++ files, run
-  `pre-commit run clang-format-fix --hook-stage manual --files <paths>`.
-  Verify formatting with `pre-commit run clang-format --files <paths>` before
-  completing the change.
+- Rely on the repository's pre-commit hooks to format C++, validate YAML
+  syntax and indentation, and lint shell scripts at commit time.
 - Preserve C++26 named modules and the native macOS-to-ARM Linux build.
 - Keep personal IP addresses out of the README.
