@@ -16,23 +16,19 @@ binary="$dashboard_home/.local/bin/family-dashboard"
   exit 1
 }
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-refresh_script="$dashboard_home/.local/bin/family-dashboard-refresh"
-install -o "$dashboard_user" -m 755 "$script_dir/refresh-morning.sh" "$refresh_script"
-
 stage_dir="$(mktemp -d)"
 trap 'rm -rf "$stage_dir"' EXIT
 
 cat > "$stage_dir/family-dashboard.service" <<EOF
 [Unit]
-Description=Refresh the family dashboard morning layout
+Description=Refresh the family dashboard layout
 
 [Service]
 Type=oneshot
 User=$dashboard_user
 SupplementaryGroups=spi gpio
 Environment=TZ=Europe/Stockholm
-ExecStart="$refresh_script"
+ExecStart="$binary" --display-auto
 EOF
 
 cat > "$stage_dir/family-dashboard.timer" <<'EOF'
@@ -57,7 +53,8 @@ systemctl enable family-dashboard.timer
 systemctl restart family-dashboard.timer
 systemctl list-timers family-dashboard.timer --no-pager
 
-printf '\nMorning layout scheduled at each minute boundary, including after reboot.\n'
+printf '\nDashboard scheduled at each minute boundary, including after reboot.\n'
+printf 'The dashboard shows tomorrow’s plans from 17:00 until midnight (Stockholm time).\n'
 printf 'A full refresh runs at the start of each hour; other minutes use partial refresh.\n'
 printf 'Logs: sudo journalctl -u family-dashboard.service -f\n'
 printf 'Stop: sudo systemctl disable --now family-dashboard.timer\n'

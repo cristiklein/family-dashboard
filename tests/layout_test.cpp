@@ -116,6 +116,26 @@ void test_dates()
         "TOMORROW / THU 05");
 }
 
+void test_refresh_schedule()
+{
+  const auto before =
+      dashboard::refresh_schedule_at(local_time(2026, 11, 3, 16, 59));
+  require(!before.afternoon && !before.full,
+          "Use today's plans and partial refresh before 17:00");
+  const auto switch_over =
+      dashboard::refresh_schedule_at(local_time(2026, 11, 3, 17, 0));
+  require(switch_over.afternoon && switch_over.full,
+          "Switch to tomorrow's plans with a full refresh at 17:00");
+  const auto evening =
+      dashboard::refresh_schedule_at(local_time(2026, 11, 3, 17, 1));
+  require(evening.afternoon && !evening.full,
+          "Use tomorrow's plans and partial refresh after 17:00");
+  const auto midnight =
+      dashboard::refresh_schedule_at(local_time(2026, 11, 4, 0, 0));
+  require(!midnight.afternoon && midnight.full,
+          "Return to today's plans with a full refresh at midnight");
+}
+
 void test_configured_content()
 {
   auto plans = config;
@@ -194,6 +214,7 @@ int main()
     test_clock(false);
     test_clock(true);
     test_dates();
+    test_refresh_schedule();
     test_configured_content();
     return 0;
   }

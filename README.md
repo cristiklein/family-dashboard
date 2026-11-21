@@ -102,7 +102,7 @@ bash scripts/deploy.sh your-user@zero.local /path/to/plans.yaml
 ```
 
 After editing plans, deploy again to update the Pi. Configuration changes do not
-require recompilation. Existing display commands and the morning timer read the
+require recompilation. Existing display commands and the timer read the
 file each time they run.
 
 ## Display test
@@ -221,7 +221,7 @@ the time at invocation and still needs scheduling for ongoing minute updates.
 On the Pi, set the timezone to `Europe/Stockholm` with `sudo raspi-config` if needed.
 
 Both layouts use your configured family summaries, dated deviations, and good
-things ahead. They do not fetch external data or switch modes automatically.
+things ahead.
 To try them on the physical panel, build and upload the executable and your
 configuration, then select a layout:
 
@@ -235,9 +235,10 @@ bash scripts/display.sh --afternoon
 The display script also accepts an SSH target, for example
 `bash scripts/display.sh your-user@zero.local --morning`.
 The executable provides `--display-morning` and `--display-afternoon` for direct
-use on the board. The existing `--preview`, `--display`, and display script
-without a mode continue to use the hardware test image (`--test` selects it
-explicitly).
+use on the board and `--display-auto` to select the layout and refresh mode
+from the current local time. The existing `--preview`, `--display`, and display
+script without a mode continue to use the hardware test image (`--test`
+selects it explicitly).
 
 To compare the vendor's fast refresh mode with full refresh:
 
@@ -388,17 +389,20 @@ with `--test --full`, then validate morning/afternoon layouts, fast refresh,
 and partial refresh on the physical panel. The Zero hardware path is not yet
 verified.
 
-### Hourly cleaning refresh
+### Automatic layout and hourly refresh
 
-The morning timer updates the display each minute, using a full refresh at
-minute `00` of every hour and partial refreshes during the other minutes.
-To install or update it, copy both scripts to the Pi and run:
+The timer starts `family-dashboard --display-auto` each minute with
+`TZ=Europe/Stockholm`. The executable shows today's plans from midnight
+until 17:00 and tomorrow's plans from 17:00 until midnight. It uses a full
+refresh at minute `00` of every hour and partial refreshes during the other
+minutes.
+After deploying the current binary, install or update the timer:
 
 ```sh
-scp scripts/install-morning-timer.sh scripts/refresh-morning.sh your-user@zero.local:~
+scp scripts/install-morning-timer.sh your-user@zero.local:~
 ssh -t your-user@zero.local 'bash ~/install-morning-timer.sh'
 ```
 
-The installer deploys the refresh script beside the existing dashboard binary
-and restarts the timer. Full refreshes may flash the panel. Missed updates while
-the Pi is off are skipped; the next full refresh runs at the next hour boundary.
+The installer updates the service and restarts the timer. Full refreshes may
+flash the panel. Missed updates while the Pi is off are skipped; the next full
+refresh runs at the next hour boundary.

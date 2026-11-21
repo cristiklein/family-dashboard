@@ -19,6 +19,17 @@ using namespace std;
 namespace
 {
 
+tm local_dashboard_time(chrono::system_clock::time_point now)
+{
+  const auto timestamp = chrono::system_clock::to_time_t(now);
+  tm local{};
+  if (localtime_r(&timestamp, &local) == nullptr)
+  {
+    throw runtime_error("Cannot determine local time for dashboard clock");
+  }
+  return local;
+}
+
 string date_label(chrono::sys_days date, bool include_month)
 {
   constexpr array<string_view, 7> weekdays{"SUN", "MON", "TUE", "WED",
@@ -100,17 +111,24 @@ void wrapped_text(dashboard::mono_image &image, string text, int x, int y,
 export namespace dashboard
 {
 
+struct scheduled_refresh
+{
+  bool afternoon;
+  bool full;
+};
+
+scheduled_refresh refresh_schedule_at(chrono::system_clock::time_point now)
+{
+  const auto local = local_dashboard_time(now);
+  return {local.tm_hour >= 17, local.tm_min == 0};
+}
+
 // Accept a time explicitly so layout tests can render reproducible images.
 mono_image configured_dashboard(
     const configuration &config, bool afternoon,
     chrono::system_clock::time_point now = chrono::system_clock::now())
 {
-  const auto timestamp = chrono::system_clock::to_time_t(now);
-  tm local{};
-  if (localtime_r(&timestamp, &local) == nullptr)
-  {
-    throw runtime_error("Cannot determine local time for dashboard clock");
-  }
+  const auto local = local_dashboard_time(now);
   // Advance the local civil date, rather than adding 24 hours across DST.
   const chrono::sys_days today{
       chrono::year{local.tm_year + 1900} /

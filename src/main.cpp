@@ -1,3 +1,4 @@
+#include <chrono>
 #include <cstdio>
 #include <exception>
 #include <print>
@@ -38,6 +39,7 @@ int main(int argc, char **argv)
     }
     argc = static_cast<int>(arguments.size());
     argv = arguments.data();
+    const auto option = argc > 1 ? string_view(argv[1]) : string_view{};
     if (argc == 1)
     {
       println("{}", dashboard::greeting());
@@ -65,15 +67,23 @@ int main(int argc, char **argv)
               dashboard::load_configuration(config_path), true));
       println("Partial demo finished; display is asleep.");
     }
-    else if ((argc == 2 ||
-              (argc == 3 && (string_view(argv[2]) == "--fast" ||
-                             string_view(argv[2]) == "--full" ||
-                             string_view(argv[2]) == "--partial"))) &&
-             (string_view(argv[1]) == "--display" ||
-              string_view(argv[1]) == "--display-morning" ||
-              string_view(argv[1]) == "--display-afternoon"))
+    else if ((argc == 2 && option == "--display-auto") ||
+             ((argc == 2 ||
+               (argc == 3 && (string_view(argv[2]) == "--fast" ||
+                              string_view(argv[2]) == "--full" ||
+                              string_view(argv[2]) == "--partial"))) &&
+              (option == "--display" || option == "--display-morning" ||
+               option == "--display-afternoon")))
     {
-      const auto refresh = argc == 3 ? string_view(argv[2]) : "--partial";
+      const auto now = chrono::system_clock::now();
+      auto refresh = argc == 3 ? string_view(argv[2]) : "--partial";
+      bool afternoon = option == "--display-afternoon";
+      if (option == "--display-auto")
+      {
+        const auto scheduled = dashboard::refresh_schedule_at(now);
+        afternoon = scheduled.afternoon;
+        refresh = scheduled.full ? "--full" : "--partial";
+      }
       const auto mode = refresh == "--fast" ? dashboard::refresh_mode::fast
                         : refresh == "--full"
                             ? dashboard::refresh_mode::full
@@ -84,13 +94,11 @@ int main(int argc, char **argv)
       {
         return 1;
       }
-      const auto option = string_view(argv[1]);
       dashboard::show_on_display(
           option == "--display"
               ? dashboard::test_image()
               : dashboard::configured_dashboard(
-                    dashboard::load_configuration(config_path),
-                    option == "--display-afternoon"),
+                    dashboard::load_configuration(config_path), afternoon, now),
           mode);
       println("Refresh finished; display is asleep.");
     }
@@ -100,7 +108,8 @@ int main(int argc, char **argv)
               "Usage: {} [--preview image.pbm | --preview-morning image.pbm | "
               "--preview-afternoon image.pbm | "
               "(--display | --display-morning | --display-afternoon) "
-              "[--partial|--fast|--full] | --demo-partial] [--config PATH]",
+              "[--partial|--fast|--full] | --display-auto | --demo-partial] "
+              "[--config PATH]",
               argv[0]);
       return 2;
     }
