@@ -1,8 +1,9 @@
 # Family dashboard
 
-![Morning layout at 07:30 showing today's plans and upcoming events](docs/morning.png)
-
-![Afternoon layout at 17:30 showing tomorrow's plans and marking two deviations](docs/afternoon.png)
+<p align="center">
+  <img src="docs/morning.png" width="49%" alt="Morning layout at 07:30 showing today's plans and upcoming events">
+  <img src="docs/afternoon.png" width="49%" alt="Afternoon layout at 17:30 showing tomorrow's plans and marking two deviations">
+</p>
 
 An e-paper dashboard that shows your family's plans and upcoming events on a
 Raspberry Pi Zero 2 W. It uses C++26 named modules and cross-compiles directly
