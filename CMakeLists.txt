@@ -29,7 +29,7 @@ target_compile_features(family-dashboard PRIVATE cxx_std_26)
 set_target_properties(family-dashboard PROPERTIES CXX_EXTENSIONS OFF)
 target_sources(family-dashboard PRIVATE
   FILE_SET CXX_MODULES FILES
-    src/greeting.cppm src/framebuffer.cppm src/display.cppm src/config.cppm src/layout.cppm)
+    src/framebuffer.cppm src/display.cppm src/config.cppm src/layout.cppm)
 
 # Deploy a standalone executable without target-side C++ runtime dependencies.
 if(CMAKE_CROSSCOMPILING)

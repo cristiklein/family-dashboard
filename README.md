@@ -10,9 +10,8 @@ Install the native build tools with Homebrew:
 
 ```sh
 brew install llvm lld cmake ninja python@3.14
-cp dashboard.example.yaml dashboard.yaml # Edit names and plans before deploying.
 bash scripts/build.sh
-bash scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
 The build script uses Homebrew Clang and LLD to produce a static ARM64 Linux
@@ -22,17 +21,11 @@ SHA256-checked against the Debian package index fetched over HTTPS; package
 names, versions, URLs, and hashes are recorded in `build/sysroot-arm64/packages.json`.
 These target packages are extracted locally, never installed on macOS.
 
-The deploy script defaults to `cklein@zero.local`, uploads the executable to
-`~/.local/bin/family-dashboard`, and runs it. Expected output:
-
-```text
-hello world
-```
-
-An alternative SSH destination can be supplied as the first argument:
+The deploy script defaults to `cklein@zero.local` and installs the executable
+at `~/.local/bin/family-dashboard` on the Pi. To deploy to another SSH destination:
 
 ```sh
-bash scripts/deploy.sh your-user@zero.local
+./scripts/deploy.sh your-user@zero.local
 ```
 
 SSH uses your normal keys or interactive password prompt. Passwords are not
@@ -93,17 +86,17 @@ this with `--config /path/to/plans.yaml` on any dashboard command. Missing or
 invalid configuration produces an error before touching the display.
 
 The live preview watches `dashboard.yaml` and reloads it when saved; it uses
-`dashboard.example.yaml` until you create your own file. Deployment uploads your
-local `dashboard.yaml` to `~/.config/family-dashboard/dashboard.yaml` on the Pi.
-An optional second deploy argument selects another local configuration file:
+`dashboard.example.yaml` until you create your own file. To set up or update
+your plans on the Pi, copy the YAML separately:
 
 ```sh
-bash scripts/deploy.sh your-user@zero.local /path/to/plans.yaml
+ssh your-user@zero.local 'install -d -m 700 ~/.config/family-dashboard'
+scp dashboard.yaml your-user@zero.local:.config/family-dashboard/dashboard.yaml.new
+ssh your-user@zero.local 'cd ~/.config/family-dashboard && chmod 600 dashboard.yaml.new && mv -fT dashboard.yaml.new dashboard.yaml'
 ```
 
-After editing plans, deploy again to update the Pi. Configuration changes do not
-require recompilation. Existing display commands and the timer read the
-file each time they run.
+Repeat the copy after editing your plans. Each refresh reads the configuration
+file again.
 
 ## Display test
 
@@ -129,23 +122,18 @@ id
 
 The executable uses `/dev/spidev0.0` and discovers the GPIO controller by its
 `pinctrl-bcm2835` label rather than assuming a GPIO chip number. The `spi` and
-`gpio` groups allow display commands to run as your normal user without sudo. A permission error means the device permissions or login
-groups need checking.
+`gpio` groups allow display commands to run as your normal user. The binary
+reports the device and suggests how to fix missing SPI or GPIO access.
 
-Build, deploy, and explicitly use a full refresh for the first hardware test:
+After deploying, run this on the Pi for the first hardware test:
 
 ```sh
-bash scripts/build.sh
-bash scripts/deploy.sh
-bash scripts/display.sh --test --full
+~/.local/bin/family-dashboard --test --full
 ```
 
-The first two commands build, upload, and print `hello world`. The third sends
-a test image with a border, greeting, and checker pattern to the panel, waits
-for completion, then powers down and enters deep sleep. The image remains
-visible. Full and fast refresh may flash the screen. Normal display commands
-still default to the experimental partial waveform; they do not perform an
-automatic cleaning refresh or fallback.
+This sends a test image with a border, greeting, and checker pattern to the panel,
+waits for completion, then powers down and enters deep sleep. The image remains
+visible. Full and fast refresh may flash the screen.
 
 | Signal | Physical header pin | BCM GPIO / SPI |
 | --- | --- | --- |
@@ -221,37 +209,25 @@ the time at invocation and still needs scheduling for ongoing minute updates.
 On the Pi, set the timezone to `Europe/Stockholm` with `sudo raspi-config` if needed.
 
 Both layouts use your configured family summaries, dated deviations, and good
-things ahead.
-To try them on the physical panel, build and upload the executable and your
-configuration, then select a layout:
+things ahead. Try them on the Pi after deploying the executable and setting up
+the YAML file:
 
 ```sh
-bash scripts/build.sh
-bash scripts/deploy.sh
-bash scripts/display.sh --morning
-bash scripts/display.sh --afternoon
+~/.local/bin/family-dashboard --help
+~/.local/bin/family-dashboard
+~/.local/bin/family-dashboard --morning
+~/.local/bin/family-dashboard --afternoon --fast
 ```
 
-The display script also accepts an SSH target, for example
-`bash scripts/display.sh your-user@zero.local --morning`.
-The executable provides `--display-morning` and `--display-afternoon` for direct
-use on the board and `--display-auto` to select the layout and refresh mode
-from the current local time. The existing `--preview`, `--display`, and display
-script without a mode continue to use the hardware test image (`--test`
-selects it explicitly).
+With no flags, the binary shows today's plans before 17:00 and tomorrow's from
+17:00 in local time. Automatic mode uses a full refresh at minute `00` each hour
+and partial refresh at other minutes. Manually selected layouts default to
+partial refresh. Use `--partial`, `--fast`, or `--full` to choose a refresh style
+for any layout. The binary logs progress to stdout and errors to stderr.
 
-To compare the vendor's fast refresh mode with full refresh:
-
-```sh
-bash scripts/display.sh --morning --fast
-bash scripts/display.sh --afternoon --fast
-bash scripts/display.sh --morning --full
-```
-
-Rebuild and upload after changing the executable. Direct board commands also
-accept a trailing `--partial`, `--fast`, or `--full`, for example
-`family-dashboard --display-morning --partial`. Partial refresh is the
-default in the executable and display script. Fast mode follows
+To run a display command over SSH from your Mac, use
+`bash scripts/display.sh your-user@zero.local --morning --full`.
+Fast mode follows
 `EPD_7IN5_V2_Init_Fast` in the
 [Waveshare reference driver](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_7in5_V2.c),
 using the same image transfer and power-off/deep-sleep sequence. This is a
@@ -386,25 +362,44 @@ Native tests exercise configuration validation, weekly schedules, dated
 overrides, countdown rendering, framebuffer and UTF-8 rendering, minute
 updates, and midnight rollover. The ARM64 build compiles
 the Linux SPI and GPIO code but does not exercise hardware. After deployment,
-run the greeting and generate a preview on the Pi before testing the HAT. Start
+run `--help` and generate a preview on the Pi before testing the HAT. Start
 with `--test --full`, then validate morning/afternoon layouts, fast refresh,
 and partial refresh on the physical panel. The Zero hardware path is not yet
 verified.
 
-### Automatic layout and hourly refresh
+## Schedule updates with systemd
 
-The timer starts `family-dashboard --display-auto` each minute with
-`TZ=Europe/Stockholm`. The executable shows today's plans from midnight
-until 17:00 and tomorrow's plans from 17:00 until midnight. It uses a full
-refresh at minute `00` of every hour and partial refreshes during the other
-minutes.
-After deploying the current binary, install or update the timer:
+Once a manual refresh works, generate the unit files on the Pi as the same
+user who ran the binary:
 
 ```sh
-scp scripts/install-morning-timer.sh your-user@zero.local:~
-ssh -t your-user@zero.local 'bash ~/install-morning-timer.sh'
+~/.local/bin/family-dashboard --systemd-service > family-dashboard.service
+~/.local/bin/family-dashboard --systemd-timer > family-dashboard.timer
+systemd-analyze --user verify ./family-dashboard.service ./family-dashboard.timer
 ```
 
-The installer updates the service and restarts the timer. Full refreshes may
-flash the panel. Missed updates while the Pi is off are skipped; the next full
-refresh runs at the next hour boundary.
+Each file has installation commands in comments. Install the service first,
+then start it once to check that it refreshes the panel. Install and enable the
+timer for minute-by-minute updates. Both units live under
+`~/.config/systemd/user/` by default and are managed with `systemctl --user`.
+To start the timer at boot and keep it running after logout, run
+`sudo loginctl enable-linger "$USER"`.
+
+If you used the previous installer, disable the old system timer before starting
+the user units with `sudo systemctl disable --now family-dashboard.timer`.
+
+The service runs as your Pi account with its device groups. It uses the Pi's
+local timezone and reads `~/.config/family-dashboard/dashboard.yaml` by default.
+Pass layout and refresh flags to `--systemd-service` to keep those settings in
+scheduled runs. Pass `--config PATH` to use another YAML file.
+Reboot after changing SPI or GPIO group membership so the user service manager
+picks up the new groups.
+
+```sh
+journalctl --user -u family-dashboard.service -f
+systemctl --user list-timers family-dashboard.timer
+systemctl --user disable --now family-dashboard.timer
+```
+
+If the Pi uses a volatile journal, read the user service's logs from the system
+journal with `sudo journalctl _SYSTEMD_USER_UNIT=family-dashboard.service _UID="$(id -u)" -f`.

@@ -6,7 +6,9 @@ module;
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <filesystem>
+#include <format>
 #include <initializer_list>
 #include <print>
 #include <span>
@@ -48,10 +50,26 @@ enum class refresh_mode
 namespace
 {
 
-[[noreturn]] void fail(const string &operation)
+[[noreturn]] void fail(const string &operation, string_view group = {})
 {
-  const auto code = errno;
-  throw system_error(code, generic_category(), operation);
+  const error_code code(errno, generic_category());
+  if (!group.empty() && (code == errc::permission_denied ||
+                         code == errc::operation_not_permitted))
+  {
+    throw system_error(
+        code, format("{} (check device permissions and your groups with id. "
+                     "If needed, run sudo usermod -aG {} \"$USER\" on the Pi "
+                     "and log out and back in)",
+                     operation, group));
+  }
+  if (group == "spi" && code == errc::no_such_file_or_directory)
+  {
+    throw system_error(
+        code,
+        operation +
+            " (enable SPI with sudo raspi-config nonint do_spi 0 and reboot)");
+  }
+  throw system_error(code, operation);
 }
 
 class file_handle
@@ -62,12 +80,12 @@ public:
   explicit file_handle(int fd) : fd_(fd)
   {
   }
-  explicit file_handle(const string &path, int flags)
+  file_handle(const string &path, int flags, string_view group)
       : fd_(::open(path.c_str(), flags | O_CLOEXEC))
   {
     if (fd_ < 0)
     {
-      fail("open " + path);
+      fail("open " + path, group);
     }
   }
   ~file_handle()
@@ -85,25 +103,43 @@ public:
 string gpio_chip_path()
 {
   // GPIO chip numbering is not an ABI. Match the Zero 2 W's controller label.
+  exception_ptr permission_error;
   for (const auto &entry : filesystem::directory_iterator("/dev"))
   {
     if (!entry.path().filename().string().starts_with("gpiochip"))
     {
       continue;
     }
-    file_handle chip(entry.path().string(), O_RDONLY);
-    gpiochip_info info{};
-    if (::ioctl(chip.get(), GPIO_GET_CHIPINFO_IOCTL, &info) < 0)
+    const auto path = entry.path().string();
+    try
     {
-      fail("inspect GPIO chip " + entry.path().string());
+      file_handle chip(path, O_RDONLY, "gpio");
+      gpiochip_info info{};
+      if (::ioctl(chip.get(), GPIO_GET_CHIPINFO_IOCTL, &info) < 0)
+      {
+        fail("inspect GPIO chip " + path, "gpio");
+      }
+      if (string_view(info.label) == "pinctrl-bcm2835")
+      {
+        return path;
+      }
     }
-    if (string_view(info.label) == "pinctrl-bcm2835")
+    catch (const system_error &error)
     {
-      return entry.path().string();
+      if (error.code() != errc::permission_denied &&
+          error.code() != errc::operation_not_permitted)
+      {
+        throw;
+      }
+      permission_error = current_exception();
     }
   }
-  throw runtime_error(
-      "Raspberry Pi Zero GPIO controller not found in /dev/gpiochip*");
+  if (permission_error)
+  {
+    rethrow_exception(permission_error);
+  }
+  throw runtime_error("Raspberry Pi Zero GPIO controller not found. "
+                      "Check for /dev/gpiochip* on the Pi");
 }
 
 void delay(int ms)
@@ -144,7 +180,7 @@ public:
     values.bits = high ? 1 : 0;
     if (::ioctl(line_.get(), GPIO_V2_LINE_SET_VALUES_IOCTL, &values) < 0)
     {
-      fail("set GPIO line");
+      fail("set GPIO line", "gpio");
     }
   }
   bool high() const
@@ -153,7 +189,7 @@ public:
     values.mask = 1;
     if (::ioctl(line_.get(), GPIO_V2_LINE_GET_VALUES_IOCTL, &values) < 0)
     {
-      fail("read GPIO line");
+      fail("read GPIO line", "gpio");
     }
     return (values.bits & 1) != 0;
   }
@@ -177,7 +213,7 @@ private:
     }
     if (::ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &request) < 0)
     {
-      fail("request BCM GPIO " + to_string(number));
+      fail("request BCM GPIO " + to_string(number), "gpio");
     }
     // The request exclusively holds the line until the returned fd is closed.
     return request.fd;
@@ -186,7 +222,7 @@ private:
 
 class spi_bus
 {
-  file_handle device_{"/dev/spidev0.0", O_RDWR};
+  file_handle device_{"/dev/spidev0.0", O_RDWR, "spi"};
 
 public:
   spi_bus()
@@ -202,7 +238,7 @@ public:
         ::ioctl(device_.get(), SPI_IOC_WR_BITS_PER_WORD, &bits) < 0 ||
         ::ioctl(device_.get(), SPI_IOC_WR_MAX_SPEED_HZ, &speed) < 0)
     {
-      fail("configure SPI");
+      fail("configure SPI", "spi");
     }
   }
   void send(span<const uint8_t> bytes)
@@ -220,7 +256,7 @@ public:
       if (::ioctl(device_.get(), SPI_IOC_MESSAGE(1), &transfer) !=
           static_cast<int>(size))
       {
-        fail("SPI transfer");
+        fail("SPI transfer", "spi");
       }
       bytes = bytes.subspan(size);
     }
@@ -234,7 +270,7 @@ public:
 class epaper
 {
   spi_bus spi_;
-  file_handle gpio_chip_{gpio_chip_path(), O_RDONLY};
+  file_handle gpio_chip_{gpio_chip_path(), O_RDONLY, "gpio"};
   gpio_pin power_{gpio_chip_.get(), 18, true, true}; // Physical pin 12.
   gpio_pin reset_{gpio_chip_.get(), 17, true, true}; // Physical pin 11.
   gpio_pin dc_{gpio_chip_.get(), 25, true};          // Physical pin 22.
