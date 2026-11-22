@@ -19,28 +19,26 @@ namespace
 {
 
 constexpr auto usage =
-    R"(Usage: family-dashboard [--auto|--morning|--afternoon|--test]
+    R"(Usage: family-dashboard [--morning|--afternoon|--test]
                         [--partial|--fast|--full] [--config PATH]
-       family-dashboard --systemd-service [layout and refresh options] [--config PATH]
+       family-dashboard --systemd-service [--morning|--afternoon|--test]
+                        [--partial|--fast|--full] [--config PATH]
        family-dashboard --systemd-timer
-       family-dashboard --preview image.pbm
-       family-dashboard (--preview-morning|--preview-afternoon) image.pbm [--config PATH]
-       family-dashboard --demo-partial [--config PATH]
        family-dashboard --help
 
-With no options, display today's plans before 17:00 and tomorrow's from
-17:00 in local time. Use a full refresh at minute 00 and partial otherwise.
---morning, --afternoon and --test default to partial refresh.
---systemd-service and --systemd-timer print user units and installation commands.
+By default, select the layout automatically. Show today's plans before 17:00
+and tomorrow's from 17:00 in local time. In this mode, use a full refresh at
+minute 00 and partial otherwise, unless a refresh style is specified.
+--morning shows today's plans. --afternoon shows tomorrow's plans.
+--test draws a hardware test image without reading the configuration.
+These three layouts default to partial refresh.
+Use --config PATH to select a YAML file for a display run or generated service.
+--systemd-service and --systemd-timer print user units with setup hints.
 )";
 
 enum class action
 {
   display,
-  preview,
-  preview_morning,
-  preview_afternoon,
-  partial_demo,
   service,
   timer
 };
@@ -50,51 +48,22 @@ struct options
   action command = action::display;
   string_view layout;
   string_view refresh;
-  string preview_path;
   string config_path;
 };
-
-string_view layout_flag(string_view flag)
-{
-  if (flag == "--auto" || flag == "--display-auto")
-  {
-    return "--auto";
-  }
-  if (flag == "--morning" || flag == "--display-morning")
-  {
-    return "--morning";
-  }
-  if (flag == "--afternoon" || flag == "--display-afternoon")
-  {
-    return "--afternoon";
-  }
-  return flag == "--test" || flag == "--display" ? "--test" : string_view{};
-}
 
 options parse_options(int argc, char **argv)
 {
   options result;
-  auto read_path = [&](int &i, string_view flag)
-  {
-    if (i + 1 == argc || string_view(argv[i + 1]).empty() ||
-        string_view(argv[i + 1]).starts_with("--"))
-    {
-      throw invalid_argument(format("{} requires a path", flag));
-    }
-    return argv[++i];
-  };
-
   for (int i = 1; i < argc; ++i)
   {
     const string_view flag = argv[i];
-    const auto layout = layout_flag(flag);
-    if (!layout.empty())
+    if (flag == "--morning" || flag == "--afternoon" || flag == "--test")
     {
       if (!result.layout.empty())
       {
         throw invalid_argument("Choose one layout");
       }
-      result.layout = layout;
+      result.layout = flag;
     }
     else if (flag == "--partial" || flag == "--fast" || flag == "--full")
     {
@@ -110,7 +79,12 @@ options parse_options(int argc, char **argv)
       {
         throw invalid_argument("Supply --config PATH once");
       }
-      result.config_path = read_path(i, flag);
+      if (i + 1 == argc || string_view(argv[i + 1]).empty() ||
+          string_view(argv[i + 1]).starts_with("--"))
+      {
+        throw invalid_argument("--config requires a path");
+      }
+      result.config_path = argv[++i];
     }
     else
     {
@@ -126,19 +100,6 @@ options parse_options(int argc, char **argv)
       {
         result.command = action::timer;
       }
-      else if (flag == "--demo-partial")
-      {
-        result.command = action::partial_demo;
-      }
-      else if (flag == "--preview" || flag == "--preview-morning" ||
-               flag == "--preview-afternoon")
-      {
-        result.preview_path = read_path(i, flag);
-        result.command = flag == "--preview" ? action::preview
-                         : flag == "--preview-morning"
-                             ? action::preview_morning
-                             : action::preview_afternoon;
-      }
       else
       {
         throw invalid_argument(format("Unknown option {}", flag));
@@ -146,15 +107,17 @@ options parse_options(int argc, char **argv)
     }
   }
 
-  if (result.command != action::display && result.command != action::service &&
-      (!result.layout.empty() || !result.refresh.empty()))
+  if (result.command == action::timer)
   {
-    throw invalid_argument(
-        "Layout and refresh options require a display or service command");
-  }
-  if (result.command == action::timer && !result.config_path.empty())
-  {
-    throw invalid_argument("Supply --config with --systemd-service");
+    if (!result.layout.empty() || !result.refresh.empty())
+    {
+      throw invalid_argument(
+          "Layout and refresh options require a display or service command");
+    }
+    if (!result.config_path.empty())
+    {
+      throw invalid_argument("Supply --config with --systemd-service");
+    }
   }
   return result;
 }
@@ -198,14 +161,7 @@ void print_service(const options &opts)
 
   // The ExecStart colon prefix keeps dollar signs in paths literal.
   print(
-      "{}",
-      R"(# Save this as family-dashboard.service, then run as the dashboard user.
-# unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-# install -D -m 644 family-dashboard.service "$unit_dir/family-dashboard.service"
-# systemctl --user daemon-reload
-# systemctl --user start family-dashboard.service
-# journalctl --user -u family-dashboard.service -f
-# For automatic updates, also generate and install the --systemd-timer unit.
+      R"(# Save as ~/.config/systemd/user/family-dashboard.service
 
 [Unit]
 Description=Refresh the family dashboard
@@ -229,17 +185,9 @@ ExecStart=":%h/.local/bin/family-dashboard")");
 void print_timer()
 {
   print(
-      "{}",
-      R"(# Install the user service first, then save this as family-dashboard.timer.
-# unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-# install -D -m 644 family-dashboard.timer "$unit_dir/family-dashboard.timer"
+      R"(# Save as ~/.config/systemd/user/family-dashboard.timer alongside the service.
 # systemctl --user daemon-reload
 # systemctl --user enable --now family-dashboard.timer
-# systemctl --user list-timers family-dashboard.timer
-# To run after logout and at boot:
-# sudo loginctl enable-linger "$USER"
-# To stop scheduled updates:
-# systemctl --user disable --now family-dashboard.timer
 
 [Unit]
 Description=Refresh the family dashboard every minute
@@ -258,7 +206,7 @@ void display(const options &opts)
 {
   const auto now = chrono::system_clock::now();
   const auto scheduled = dashboard::refresh_schedule_at(now);
-  const bool automatic = opts.layout.empty() || opts.layout == "--auto";
+  const bool automatic = opts.layout.empty();
   const bool test = opts.layout == "--test";
   const bool afternoon =
       automatic ? scheduled.afternoon : opts.layout == "--afternoon";
@@ -291,26 +239,6 @@ void run(const options &opts)
   case action::display:
     display(opts);
     break;
-  case action::preview:
-    dashboard::test_image().write_pbm(opts.preview_path);
-    println("Wrote 800x480 preview to {}", opts.preview_path);
-    break;
-  case action::preview_morning:
-  case action::preview_afternoon:
-    dashboard::configured_dashboard(
-        dashboard::load_configuration(opts.config_path),
-        opts.command == action::preview_afternoon)
-        .write_pbm(opts.preview_path);
-    println("Wrote 800x480 dashboard to {}", opts.preview_path);
-    break;
-  case action::partial_demo:
-  {
-    const auto config = dashboard::load_configuration(opts.config_path);
-    dashboard::show_partial_demo(dashboard::configured_dashboard(config, false),
-                                 dashboard::configured_dashboard(config, true));
-    println("Partial demo finished; display is asleep.");
-    break;
-  }
   case action::service:
     print_service(opts);
     break;

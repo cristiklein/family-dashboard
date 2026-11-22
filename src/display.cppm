@@ -294,18 +294,6 @@ public:
     sleep();
   }
 
-  void partial_demo(const dashboard::mono_image &first,
-                    const dashboard::mono_image &second)
-  {
-    println("Drawing initial image with partial refresh...");
-    refresh(first, dashboard::refresh_mode::partial);
-    println("Initial image ready. Partial update in 5 seconds...");
-    fflush(stdout);
-    delay(5000);
-    refresh(second, dashboard::refresh_mode::partial);
-    sleep();
-  }
-
 private:
   void refresh_partial(const dashboard::mono_image &image)
   {
@@ -448,18 +436,7 @@ void show_on_display(const mono_image &image,
   epaper panel;
   panel.show(image, mode);
 #else
-  throw runtime_error("Display output requires Linux; use --preview on macOS");
-#endif
-}
-
-// Two partial updates in one session; no initial fast/full cleaning refresh.
-void show_partial_demo(const mono_image &first, const mono_image &second)
-{
-#ifdef __linux__
-  epaper panel;
-  panel.partial_demo(first, second);
-#else
-  throw runtime_error("Display output requires Linux; use --preview on macOS");
+  throw runtime_error("Display output requires Linux");
 #endif
 }
 

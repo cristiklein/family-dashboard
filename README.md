@@ -10,16 +10,9 @@ Install the native build tools with Homebrew:
 
 ```sh
 brew install llvm lld cmake ninja python@3.14
-bash scripts/build.sh
+./scripts/build.sh
 ./scripts/deploy.sh
 ```
-
-The build script uses Homebrew Clang and LLD to produce a static ARM64 Linux
-executable at `build/arm64-native/family-dashboard`. On first run it downloads
-Debian trixie ARM64 headers and libraries into `build/sysroot-arm64`. Packages are
-SHA256-checked against the Debian package index fetched over HTTPS; package
-names, versions, URLs, and hashes are recorded in `build/sysroot-arm64/packages.json`.
-These target packages are extracted locally, never installed on macOS.
 
 The deploy script defaults to `cklein@zero.local` and installs the executable
 at `~/.local/bin/family-dashboard` on the Pi. To deploy to another SSH destination:
@@ -74,36 +67,26 @@ text. Duplicate keys or member IDs, unknown fields or members, invalid dates,
 and summary values written as lists or mappings are rejected. Keep summaries
 short so they fit in the panel's two lines before it adds `...`.
 
-The build downloads [yaml-cpp 0.8.0](https://github.com/jbeder/yaml-cpp/tree/0.8.0),
-checks its SHA256 hash, and links it statically for both targets. No YAML runtime
-package is needed on the Pi. CMake caches the source in each build directory;
-`build/dependencies/yaml-cpp-0.8.0.tar.gz`, if present, is used as a local archive
-with the same hash check.
-
 The executable reads `dashboard.yaml` in the current directory, falling back to
 `~/.config/family-dashboard/dashboard.yaml` if no local file exists. Override
 this with `--config /path/to/plans.yaml` on any dashboard command. Missing or
 invalid configuration produces an error before touching the display.
 
-The live preview watches `dashboard.yaml` and reloads it when saved; it uses
-`dashboard.example.yaml` until you create your own file. To set up or update
-your plans on the Pi, copy the YAML separately:
+Create the configuration directory once, then copy your plans to the Pi:
 
 ```sh
 ssh your-user@zero.local 'install -d -m 700 ~/.config/family-dashboard'
-scp dashboard.yaml your-user@zero.local:.config/family-dashboard/dashboard.yaml.new
-ssh your-user@zero.local 'cd ~/.config/family-dashboard && chmod 600 dashboard.yaml.new && mv -fT dashboard.yaml.new dashboard.yaml'
+scp dashboard.yaml your-user@zero.local:.config/family-dashboard/
 ```
 
-Repeat the copy after editing your plans. Each refresh reads the configuration
-file again.
+After editing your plans, rerun the `scp` command. The dashboard reads the file
+on each refresh.
 
 ## Display test
 
-The display backend targets the Waveshare 7.5-inch **black-and-white V2,
-800x480**, with its Driver HAT on the Zero 2 W's 40-pin header. The Pi needs a
-soldered header (or properly wired connections). Power off before attaching the
-HAT, and align pin 1 on both boards.
+Use the Waveshare 7.5-inch **black-and-white V2 (800×480)** display with its
+Driver HAT. Follow the Raspberry Pi connection instructions in the
+[Waveshare HAT manual](https://www.waveshare.com/wiki/7.5inch_e-Paper_HAT_Manual).
 
 Once, on the Pi, enable SPI and grant your login account device access:
 
@@ -120,10 +103,8 @@ ls -l /dev/spidev0.0 /dev/gpiochip*
 id
 ```
 
-The executable uses `/dev/spidev0.0` and discovers the GPIO controller by its
-`pinctrl-bcm2835` label rather than assuming a GPIO chip number. The `spi` and
-`gpio` groups allow display commands to run as your normal user. The binary
-reports the device and suggests how to fix missing SPI or GPIO access.
+The `spi` and `gpio` groups let your account access the display. The binary
+reports the device and suggests a fix if access fails.
 
 After deploying, run this on the Pi for the first hardware test:
 
@@ -135,77 +116,16 @@ This sends a test image with a border, greeting, and checker pattern to the pane
 waits for completion, then powers down and enters deep sleep. The image remains
 visible. Full and fast refresh may flash the screen.
 
-| Signal | Physical header pin | BCM GPIO / SPI |
-| --- | --- | --- |
-| MOSI | 19 | GPIO10 / SPI0 MOSI |
-| CLK | 23 | GPIO11 / SPI0 SCLK |
-| CS | 24 | GPIO8 / SPI0 CE0 (`/dev/spidev0.0`) |
-| RST | 11 | GPIO17 |
-| DC | 22 | GPIO25 |
-| BUSY | 18 | GPIO24; active LOW |
-| PWR (newer HATs) | 12 | GPIO18 |
-
-The control lines use Linux's GPIO character-device v2 API, with exclusive
-line ownership and initial output levels set atomically. Lines already in use
-are rejected. Outputs are driven low during normal cleanup, and closing their
-file descriptors releases the line requests. BUSY waits time out after 30
-seconds. SPI uses mode 0, 8-bit words, 500 kHz, and transfers of up to 4096
-bytes; the kernel controls chip select. MISO is unused. No external GPIO library
-is linked into the executable.
-
-Wiring follows [Waveshare's HAT manual](https://www.waveshare.com/wiki/7.5inch_e-Paper_HAT_Manual).
-Panel register settings are adapted from
-[Waveshare's reference driver](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_7in5_V2.c);
-its license is in `third_party/Waveshare-LICENSE.txt`.
-
-For a browser preview that updates automatically while you edit:
-
-```sh
-bash scripts/preview.sh
-```
-
-This opens a local viewer at `http://127.0.0.1:8765/`. Choose morning, afternoon,
-or the hardware test image. Saving source files or the configuration updates
-the images; the browser updates without clicking or refocusing it.
-The layout clocks also advance automatically every minute without rebuilding.
-The viewer builds in `build/preview/native`, separately from `build/macos`.
-Restart the preview script after updating the watcher itself.
-If a build fails, the last successful image stays visible and the error is
-printed in the terminal. Stop the watcher with Ctrl+C. The viewer binds only to
-your Mac's loopback interface and uses Python's standard library plus the
-existing CMake/Clang build and macOS `sips` image converter. Use `--no-open` to
-skip opening a browser, or `--port 8766` to choose another port. `LLVM_ROOT` and
-`PYTHON` work as with the build script.
-
-To generate a single preview file instead:
-
-```sh
-cmake -S . -B build/macos -G Ninja \
-  -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++"
-cmake --build build/macos
-build/macos/family-dashboard --preview build/display-preview.pbm
-sips -s format png build/display-preview.pbm --out build/display-preview.png
-```
-
 ## Text rendering
 
-### Dashboard layout experiment
-
-Generate morning and afternoon layouts at the panel's exact 800x480 resolution:
-
-```sh
-build/macos/family-dashboard --preview-morning build/morning.pbm
-build/macos/family-dashboard --preview-afternoon build/afternoon.pbm
-sips -s format png build/morning.pbm --out build/morning.png
-sips -s format png build/afternoon.pbm --out build/afternoon.png
-```
+### Dashboard layouts
 
 Both layouts show a 24-hour clock (HH:MM) and the current date using the
 machine's local timezone. The morning agenda is labelled with today's date;
 the afternoon agenda uses tomorrow's calendar date, including across month,
 year, and daylight-saving boundaries. Date labels use English abbreviations.
-The browser preview advances it each minute; a physical display command draws
-the time at invocation and still needs scheduling for ongoing minute updates.
+Each refresh draws the time at invocation. Use the systemd timer for ongoing
+minute updates.
 On the Pi, set the timezone to `Europe/Stockholm` with `sudo raspi-config` if needed.
 
 Both layouts use your configured family summaries, dated deviations, and good
@@ -219,14 +139,9 @@ the YAML file:
 ~/.local/bin/family-dashboard --afternoon --fast
 ```
 
-With no flags, the binary shows today's plans before 17:00 and tomorrow's from
-17:00 in local time. Automatic mode uses a full refresh at minute `00` each hour
-and partial refresh at other minutes. Manually selected layouts default to
-partial refresh. Use `--partial`, `--fast`, or `--full` to choose a refresh style
-for any layout. The binary logs progress to stdout and errors to stderr.
+Run `family-dashboard --help` for supported options and the default layout and
+refresh schedule. The binary logs progress to stdout and errors to stderr.
 
-To run a display command over SSH from your Mac, use
-`bash scripts/display.sh your-user@zero.local --morning --full`.
 Fast mode follows
 `EPD_7IN5_V2_Init_Fast` in the
 [Waveshare reference driver](https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/c/lib/e-Paper/EPD_7in5_V2.c),
@@ -236,29 +151,13 @@ speed, contrast, and ghosting need verification on the physical panel. If
 afterimages appear, use `--full` for a cleaning refresh. Refresh timing is
 printed by the executable for comparison.
 
-To experiment with an update that avoids the whole-screen flash:
-
-```sh
-bash scripts/build.sh
-bash scripts/deploy.sh
-bash scripts/display.sh --demo-partial
-```
-
-The demo draws morning with partial refresh, waits five seconds, then switches
-to afternoon with another partial refresh. There is no initial fast or full
-refresh. Watch both transitions for flashing, inverted text, or afterimages. This
-uses the vendor's partial initialization and window commands, with white=1
-pixel data as in its Python driver. The controller stays powered between the
-two images and enters deep sleep after the demo. The direct executable option
-is `--demo-partial`; it cannot be combined with layout or refresh flags in the
-display script.
-
 Normal display commands now also attempt standalone partial updates after waking
 from deep sleep, using the retained visible image without restoring controller
 RAM. This wake-up behavior and all refresh modes still need verification on
 the Zero 2 W. Ghosting may accumulate during this experiment. Individual display
 commands do not trigger a cleaning refresh automatically after an error. Use
-`bash scripts/display.sh --afternoon --full` for a cleaning refresh.
+`~/.local/bin/family-dashboard --afternoon --full` on the Pi for a cleaning
+refresh.
 
 ### Font coverage
 
@@ -329,29 +228,12 @@ stage the fixes and retry the commit. Yamllint checks YAML syntax, duplicate
 keys, and two-space indentation. The CLI and the hook both read `.yamllint`.
 ShellCheck checks shell scripts.
 
-## Toolchain and compatibility
-
-CMake and Ninja track named-module dependencies using Clang's module scanner.
-`cmake/zero.cmake` targets `aarch64-linux-gnu` and Cortex-A53, uses the local
-ARM64 Linux sysroot, and links with LLD. Apple Clang and the macOS linker are
-not used for the Linux executable.
-
-The ARM64 executable is statically linked, avoiding target-side glibc and
-libstdc++ version dependencies. The Linux GPIO v2 API requires kernel 5.10 or
-newer; the target is the Zero 2 W on 64-bit Raspberry Pi OS Trixie. Actual
-execution and display output on the Pi are the final compatibility checks.
-
-`LLVM_ROOT`, `LLD_ROOT`, and `PYTHON` override the build script's Homebrew tool
-locations. Downloads and generated outputs are contained in the ignored
-`build/` directory. Delete `build/sysroot-arm64` and the relevant downloads to
-refresh target packages.
-
 ## Verification
 
 Before deployment, run:
 
 ```sh
-bash scripts/build.sh
+./scripts/build.sh
 cmake -S . -B build/macos -G Ninja \
   -DCMAKE_CXX_COMPILER="$(brew --prefix llvm)/bin/clang++"
 cmake --build build/macos
@@ -362,31 +244,29 @@ Native tests exercise configuration validation, weekly schedules, dated
 overrides, countdown rendering, framebuffer and UTF-8 rendering, minute
 updates, and midnight rollover. The ARM64 build compiles
 the Linux SPI and GPIO code but does not exercise hardware. After deployment,
-run `--help` and generate a preview on the Pi before testing the HAT. Start
+run `--help` on the Pi before testing the HAT. Start
 with `--test --full`, then validate morning/afternoon layouts, fast refresh,
 and partial refresh on the physical panel. The Zero hardware path is not yet
 verified.
 
 ## Schedule updates with systemd
 
-Once a manual refresh works, generate the unit files on the Pi as the same
-user who ran the binary:
+If you used the previous system-wide installer, disable its timer with
+`sudo systemctl disable --now family-dashboard.timer`.
+
+Once a manual refresh works, run these commands on the Pi as the same user:
 
 ```sh
-~/.local/bin/family-dashboard --systemd-service > family-dashboard.service
-~/.local/bin/family-dashboard --systemd-timer > family-dashboard.timer
-systemd-analyze --user verify ./family-dashboard.service ./family-dashboard.timer
+mkdir -p ~/.config/systemd/user
+~/.local/bin/family-dashboard --systemd-service > ~/.config/systemd/user/family-dashboard.service
+~/.local/bin/family-dashboard --systemd-timer > ~/.config/systemd/user/family-dashboard.timer
+systemctl --user daemon-reload
+systemctl --user enable --now family-dashboard.timer
 ```
 
-Each file has installation commands in comments. Install the service first,
-then start it once to check that it refreshes the panel. Install and enable the
-timer for minute-by-minute updates. Both units live under
-`~/.config/systemd/user/` by default and are managed with `systemctl --user`.
-To start the timer at boot and keep it running after logout, run
+The timer refreshes the display every minute. To start it at boot and keep it
+running after logout, run
 `sudo loginctl enable-linger "$USER"`.
-
-If you used the previous installer, disable the old system timer before starting
-the user units with `sudo systemctl disable --now family-dashboard.timer`.
 
 The service runs as your Pi account with its device groups. It uses the Pi's
 local timezone and reads `~/.config/family-dashboard/dashboard.yaml` by default.
@@ -403,3 +283,41 @@ systemctl --user disable --now family-dashboard.timer
 
 If the Pi uses a volatile journal, read the user service's logs from the system
 journal with `sudo journalctl _SYSTEMD_USER_UNIT=family-dashboard.service _UID="$(id -u)" -f`.
+
+## Advanced Topics
+
+### Custom systemd configuration directory
+
+If your systemd user manager uses `XDG_CONFIG_HOME`, put both unit files in
+`$XDG_CONFIG_HOME/systemd/user/`.
+
+### Toolchain and compatibility
+
+The build script uses Homebrew Clang and LLD to produce a static ARM64 Linux
+executable at `build/arm64-native/family-dashboard`. On the first run, it
+downloads Debian Trixie ARM64 packages and extracts the target headers and
+libraries into `build/sysroot-arm64` for cross-compilation. The script verifies
+package SHA-256 hashes against the Debian package index fetched over HTTPS and
+records package names, versions, URLs, and hashes in
+`build/sysroot-arm64/packages.json`.
+
+CMake and Ninja track named-module dependencies using Clang's module scanner.
+`cmake/zero.cmake` targets `aarch64-linux-gnu` and Cortex-A53, uses the local
+ARM64 Linux sysroot, and links with LLD. Apple Clang and the macOS linker are
+not used for the Linux executable.
+
+Static linking avoids target-side glibc and libstdc++ version dependencies.
+The Linux GPIO v2 API requires kernel 5.10 or newer. The target is the
+Zero 2 W on 64-bit Raspberry Pi OS Trixie. Actual execution and display output
+on the Pi are the final compatibility checks.
+
+`LLVM_ROOT`, `LLD_ROOT`, and `PYTHON` override the build script's Homebrew tool
+locations. Downloads and generated outputs are contained in the ignored
+`build/` directory. Delete `build/sysroot-arm64` and the relevant downloads to
+refresh target packages.
+
+The build downloads yaml-cpp 0.8.0, verifies its SHA-256 hash, and links it
+statically into the macOS and Pi builds. CMake caches the source in each build
+directory. If `build/dependencies/yaml-cpp-0.8.0.tar.gz` is present, CMake uses
+that archive and verifies it against the same hash.
+[yaml-cpp 0.8.0 source](https://github.com/jbeder/yaml-cpp/tree/0.8.0)

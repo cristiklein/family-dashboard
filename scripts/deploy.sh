@@ -11,7 +11,7 @@ if (( $# > 1 )); then
 fi
 
 if [[ ! -f "$binary" || ! -s "$binary" ]]; then
-  echo 'Build first: bash scripts/build.sh' >&2
+  echo 'Build first: ./scripts/build.sh' >&2
   exit 1
 fi
 

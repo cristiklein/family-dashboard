@@ -2,8 +2,6 @@ module;
 
 #include <array>
 #include <cstdint>
-#include <fstream>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -38,22 +36,6 @@ struct mono_image
       {
         black_pixel(col, row);
       }
-    }
-  }
-
-  void write_pbm(const string &path) const
-  {
-    ofstream output(path, ios::binary);
-    output << "P4\n" << width << ' ' << height << '\n';
-    // PBM uses the opposite polarity: black = 1.
-    for (auto byte : pixels)
-    {
-      output.put(static_cast<char>(byte ^ 0xff));
-    }
-    output.flush();
-    if (!output)
-    {
-      throw runtime_error("Cannot write preview: " + path);
     }
   }
 };
