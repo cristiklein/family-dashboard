@@ -205,21 +205,16 @@ on the Pi with the attached panel.
 
 ### Coding style
 
-C++ sources and modules use Allman braces with two-space indentation in
-`.clang-format`. Use `using namespace std;` in source files and place it
-after the declaration and imports in module units. See `AGENTS.md` for the
-project conventions.
+Prefer conventions enforced through pre-commit over instructions in
+`AGENTS.md`. This ensures both humans and agents follow the same rules.
 
-Install the Git hooks once per clone:
+See [AGENTS.md](AGENTS.md) for project conventions. Install the
+[pre-commit hooks](.pre-commit-config.yaml) once per clone.
 
 ```sh
 brew install pre-commit
 pre-commit install
 ```
-
-The hooks run Clang-format for C++, Yamllint for YAML, and ShellCheck for shell
-scripts. They also reject the literal value of `$USER` anywhere in staged file
-contents. Stage any fixes and retry the commit.
 
 ### Toolchain and compatibility
 
