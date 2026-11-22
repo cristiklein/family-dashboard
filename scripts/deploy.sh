@@ -15,20 +15,26 @@ if [[ ! -f "$binary" || ! -s "$binary" ]]; then
   exit 1
 fi
 
-expected_size="$(wc -c < "$binary" | tr -d '[:space:]')"
-ssh -T -- "$target" 'expected_size='"$expected_size"'
+expected_sha256="$(shasum -a 256 < "$binary" | cut -d ' ' -f 1)"
+remote_script="$(cat <<'REMOTE'
   set -eu
   test "$(uname -m)" = aarch64 || { echo "Expected 64-bit Raspberry Pi OS." >&2; exit 1; }
   bin_dir="$HOME/.local/bin"
   mkdir -p "$bin_dir"
   staged_binary="$(mktemp "$bin_dir/.family-dashboard.XXXXXXXX")"
-  trap '\''rm -f -- "$staged_binary"'\'' EXIT
+  trap 'rm -f -- "$staged_binary"' EXIT
   cat > "$staged_binary"
-  if [ "$(wc -c < "$staged_binary")" -ne "$expected_size" ]; then
-    echo "Incomplete executable upload." >&2
+  actual_sha256="$(sha256sum < "$staged_binary")"
+  actual_sha256="${actual_sha256%% *}"
+  if [ "$actual_sha256" != "$expected_sha256" ]; then
+    echo "Executable upload failed SHA-256 verification." >&2
     exit 1
   fi
+  printf "Verified staged executable SHA-256: %s\n" "$actual_sha256"
   chmod 755 "$staged_binary"
   mv -fT -- "$staged_binary" "$bin_dir/family-dashboard"
   printf "Installed %s\n" "$bin_dir/family-dashboard"
-' < "$binary"
+REMOTE
+)"
+
+ssh -T -- "$target" "expected_sha256=$expected_sha256; $remote_script" < "$binary"
