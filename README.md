@@ -135,6 +135,28 @@ To stop scheduled updates, run
 
 ## Advanced Topics
 
+### Reuse SSH connections for deployments
+
+If SSH asks for your YubiKey PIN on each deployment, add these settings to the
+`Host zero.local` block in `~/.ssh/config` on your Mac. Create the block if
+needed and use the hostname or alias you pass to the deploy scripts.
+
+```sshconfig
+Host zero.local
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%C
+    ControlPersist 15m
+```
+
+The first connection authenticates as usual. Both deploy scripts can then
+reuse it when they connect to the same host as the same user. SSH closes the
+connection after 15 minutes with no sessions using it.
+
+`ControlPath` has no default. It gives SSH a local socket to find the shared
+connection. The `cm-` prefix is arbitrary, and `%C` is a short hash that
+includes the remote host, port, and login user.
+[OpenSSH configuration manual](https://man.openbsd.org/ssh_config#ControlPath)
+
 ### VS Code
 
 Install the recommended **clangd** extension
