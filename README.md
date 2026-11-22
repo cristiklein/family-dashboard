@@ -269,3 +269,9 @@ the physical panel.
   `$XDG_CONFIG_HOME/systemd/user/`.
 - If the Pi uses a volatile journal, read the service logs with
   `sudo journalctl _SYSTEMD_USER_UNIT=family-dashboard.service _UID="$(id -u)" -f`.
+
+## License
+
+The original project code is available under the MIT License. The adapted
+Waveshare display code carries its upstream notice.
+[MIT License](LICENSE) · [Waveshare notice](third_party/Waveshare-LICENSE.txt)
