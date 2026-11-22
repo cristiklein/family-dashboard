@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Reject IPv4 and IPv6 literals in source and other text files."""
 
-from ipaddress import ip_address
-from pathlib import Path
 import re
 import sys
-
+from ipaddress import ip_address
+from pathlib import Path
 
 IP_CANDIDATE = re.compile(
     r"(?<![\w.])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?!\w|\.[0-9])"

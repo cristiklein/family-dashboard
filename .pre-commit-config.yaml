@@ -12,6 +12,11 @@ repos:
     rev: v0.11.0.1-1
     hooks:
       - id: shellcheck
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+        args: [--extend-select=I]
   - repo: local
     hooks:
       - id: no-local-username

@@ -5,10 +5,10 @@ import hashlib
 import io
 import json
 import lzma
-from pathlib import Path
 import subprocess
 import tarfile
 import urllib.request
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "build"
 SYSROOT = ROOT / "sysroot-arm64"

@@ -1,13 +1,12 @@
 """Keep GitHub Actions shell logic in repository scripts that can run locally."""
 
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 import yaml
-
 
 WORKFLOWS_DIR = Path(".github/workflows")
 SCRIPT = r"\./scripts/(?:[\w-]+/)*[\w-][\w.-]*"

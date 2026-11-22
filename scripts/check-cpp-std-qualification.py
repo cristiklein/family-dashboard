@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Require reasons for std:: qualifiers and check module using directives."""
 
-from pathlib import Path
 import re
 import sys
-
+from pathlib import Path
 
 NON_CODE = re.compile(
     r'(?<!\w)(?:u8|u|U|L)?R"(?P<delimiter>[^ ()\\\s]{0,16})'
