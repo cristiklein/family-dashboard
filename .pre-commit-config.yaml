@@ -25,3 +25,8 @@ repos:
         language: script
         entry: scripts/check-ip-addresses.py
         types: [text]
+      - id: cpp-std-qualification
+        name: Check C++ standard-library qualification
+        language: script
+        entry: scripts/check-cpp-std-qualification.py
+        files: '\.(cpp|cppm)$'
