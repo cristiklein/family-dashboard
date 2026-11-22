@@ -12,3 +12,11 @@ repos:
     rev: v0.11.0.1-1
     hooks:
       - id: shellcheck
+  - repo: local
+    hooks:
+      - id: no-local-username
+        name: Check for the local username in file contents
+        language: script
+        entry: scripts/check-local-username.py
+        types: []
+        types_or: [file, symlink]

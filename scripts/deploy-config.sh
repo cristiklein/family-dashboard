@@ -2,7 +2,7 @@
 set -euo pipefail
 
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-target="${1:-cklein@zero.local}"
+target="${1:-zero.local}"
 config="$project_dir/dashboard.yaml"
 
 if (( $# > 1 )); then

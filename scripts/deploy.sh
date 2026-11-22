@@ -2,7 +2,7 @@
 set -euo pipefail
 
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-target="${1:-cklein@zero.local}"
+target="${1:-zero.local}"
 binary="$project_dir/build/arm64-native/family-dashboard"
 
 if (( $# > 1 )); then

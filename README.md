@@ -17,13 +17,13 @@ the Pi:
 ```sh
 brew install llvm lld cmake ninja python@3.14
 ./scripts/build.sh
-./scripts/deploy.sh your-user@zero.local
+./scripts/deploy.sh
 ```
 
-Use your Pi username and hostname in the last command. With no argument,
-`./scripts/deploy.sh` uses `cklein@zero.local`. The script uses your normal
-SSH login and installs the executable at `~/.local/bin/family-dashboard` on
-the Pi.
+Both deploy scripts default to `zero.local`. SSH uses your Mac username unless
+you set `User` in `~/.ssh/config` or pass an explicit target such as
+`your-user@zero.local`. `deploy.sh` installs the executable at
+`~/.local/bin/family-dashboard` on the Pi.
 
 ## Display test
 
@@ -61,7 +61,7 @@ cp dashboard.example.yaml dashboard.yaml
 Upload your configuration to the Pi:
 
 ```sh
-./scripts/deploy-config.sh your-user@zero.local
+./scripts/deploy-config.sh
 ```
 
 The script uses the same default SSH target as `deploy.sh` and installs the file
@@ -218,7 +218,8 @@ pre-commit install
 ```
 
 The hooks run Clang-format for C++, Yamllint for YAML, and ShellCheck for shell
-scripts. Stage any formatting fixes and retry the commit.
+scripts. They also reject the literal value of `$USER` anywhere in staged file
+contents. Stage any fixes and retry the commit.
 
 ### Toolchain and compatibility
 
