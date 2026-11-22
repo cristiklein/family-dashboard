@@ -15,7 +15,7 @@ On your Mac, install the build tools, build the executable, and upload it to
 the Pi:
 
 ```sh
-brew install llvm lld cmake ninja python@3.14
+./scripts/install-build-tools.sh
 ./scripts/build.sh
 ./scripts/deploy.sh
 ```
@@ -215,6 +215,8 @@ See [AGENTS.md](AGENTS.md) for project conventions. Install the
 brew install pre-commit
 pre-commit install
 ```
+
+Run the same checks as CI with `pre-commit run --all-files --show-diff-on-failure`.
 
 ### Toolchain and compatibility
 

@@ -30,3 +30,10 @@ repos:
         language: script
         entry: scripts/check-cpp-std-qualification.py
         files: '\.(cpp|cppm)$'
+      - id: ci-run-steps
+        name: Check that CI run steps can be run locally
+        language: python
+        entry: python scripts/check-ci-run-steps.py
+        additional_dependencies: [PyYAML==6.0.4]
+        always_run: true
+        pass_filenames: false

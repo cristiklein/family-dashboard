@@ -13,6 +13,13 @@ cmake -S "$project_dir" -B "$project_dir/build/arm64-native" -G Ninja \
   -DCMAKE_CXX_COMPILER="$llvm_dir/bin/clang++" \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build "$project_dir/build/arm64-native"
-file "$binary"
+
+artifact="$(LC_ALL=C file -b "$binary")"
+printf '%s: %s\n' "$binary" "$artifact"
+if [[ "$artifact" != "ELF 64-bit LSB executable, ARM aarch64,"* ]]; then
+  echo 'Expected a 64-bit AArch64 ELF executable.' >&2
+  exit 1
+fi
+
 sha256="$(shasum -a 256 < "$binary" | cut -d ' ' -f 1)"
 printf 'Built executable SHA-256: %s\n' "$sha256"
