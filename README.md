@@ -207,8 +207,9 @@ on the Pi with the attached panel.
 
 ### Coding style
 
-Prefer conventions enforced through pre-commit over instructions in
-`AGENTS.md`. This ensures both humans and agents follow the same rules.
+Prefer automated checks for project conventions so humans and agents follow
+the same rules. Use pre-commit for fast local feedback and CI to rerun those
+checks and verify the build.
 
 See [AGENTS.md](AGENTS.md) for project conventions. Install the
 [pre-commit hooks](.pre-commit-config.yaml) once per clone.
