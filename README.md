@@ -58,15 +58,16 @@ family's names and plans. Git ignores your local file.
 cp dashboard.example.yaml dashboard.yaml
 ```
 
-Create the configuration directory once, then copy your plans to the Pi:
+Upload your configuration to the Pi:
 
 ```sh
-ssh your-user@zero.local 'install -d -m 700 ~/.config/family-dashboard'
-scp dashboard.yaml your-user@zero.local:.config/family-dashboard/
+./scripts/deploy-config.sh your-user@zero.local
 ```
 
-After editing your plans, rerun the `scp` command. Each refresh reads the file
-again. On the Pi, try your configured dashboard:
+The script uses the same default SSH target as `deploy.sh` and installs the file
+at `~/.config/family-dashboard/dashboard.yaml`. After editing your local plans,
+rerun `deploy-config.sh`. Each refresh reads the file again. On the Pi, try your
+configured dashboard:
 
 ```sh
 ~/.local/bin/family-dashboard
