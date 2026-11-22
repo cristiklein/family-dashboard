@@ -93,27 +93,27 @@ void test_dates()
     require_label(morning, today, 24, 90, 3);
     require_label(afternoon, tomorrow, 24, 90, 3);
   };
-  check(local_time(2026, 11, 3), "TUE 03 NOV", "TODAY / TUE 03",
-        "TOMORROW / WED 04");
-  check(local_time(2026, 11, 30), "MON 30 NOV", "TODAY / MON 30",
-        "TOMORROW / TUE 01");
-  check(local_time(2026, 12, 31), "THU 31 DEC", "TODAY / THU 31",
-        "TOMORROW / FRI 01");
-  check(local_time(2024, 2, 28), "WED 28 FEB", "TODAY / WED 28",
-        "TOMORROW / THU 29");
-  check(local_time(2024, 2, 29), "THU 29 FEB", "TODAY / THU 29",
-        "TOMORROW / FRI 01");
-  check(local_time(2025, 2, 28), "FRI 28 FEB", "TODAY / FRI 28",
-        "TOMORROW / SAT 01");
+  check(local_time(2026, 11, 3), "TUE 03 NOV", "TODAY / TUE 03 NOV",
+        "TOMORROW / WED 04 NOV");
+  check(local_time(2026, 11, 30), "MON 30 NOV", "TODAY / MON 30 NOV",
+        "TOMORROW / TUE 01 DEC");
+  check(local_time(2026, 12, 31), "THU 31 DEC", "TODAY / THU 31 DEC",
+        "TOMORROW / FRI 01 JAN");
+  check(local_time(2024, 2, 28), "WED 28 FEB", "TODAY / WED 28 FEB",
+        "TOMORROW / THU 29 FEB");
+  check(local_time(2024, 2, 29), "THU 29 FEB", "TODAY / THU 29 FEB",
+        "TOMORROW / FRI 01 MAR");
+  check(local_time(2025, 2, 28), "FRI 28 FEB", "TODAY / FRI 28 FEB",
+        "TOMORROW / SAT 01 MAR");
   // In Stockholm these cross the spring and autumn daylight-saving changes.
-  check(local_time(2026, 3, 28, 23, 30), "SAT 28 MAR", "TODAY / SAT 28",
-        "TOMORROW / SUN 29");
-  check(local_time(2026, 10, 25, 0, 30), "SUN 25 OCT", "TODAY / SUN 25",
-        "TOMORROW / MON 26");
-  check(local_time(2026, 11, 3, 23, 59), "TUE 03 NOV", "TODAY / TUE 03",
-        "TOMORROW / WED 04");
-  check(local_time(2026, 11, 4, 0, 0), "WED 04 NOV", "TODAY / WED 04",
-        "TOMORROW / THU 05");
+  check(local_time(2026, 3, 28, 23, 30), "SAT 28 MAR", "TODAY / SAT 28 MAR",
+        "TOMORROW / SUN 29 MAR");
+  check(local_time(2026, 10, 25, 0, 30), "SUN 25 OCT", "TODAY / SUN 25 OCT",
+        "TOMORROW / MON 26 OCT");
+  check(local_time(2026, 11, 3, 23, 59), "TUE 03 NOV", "TODAY / TUE 03 NOV",
+        "TOMORROW / WED 04 NOV");
+  check(local_time(2026, 11, 4, 0, 0), "WED 04 NOV", "TODAY / WED 04 NOV",
+        "TOMORROW / THU 05 NOV");
 }
 
 void test_refresh_schedule()

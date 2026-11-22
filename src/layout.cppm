@@ -30,7 +30,7 @@ tm local_dashboard_time(chrono::system_clock::time_point now)
   return local;
 }
 
-string date_label(chrono::sys_days date, bool include_month)
+string date_label(chrono::sys_days date)
 {
   constexpr array<string_view, 7> weekdays{"SUN", "MON", "TUE", "WED",
                                            "THU", "FRI", "SAT"};
@@ -38,13 +38,9 @@ string date_label(chrono::sys_days date, bool include_month)
                                           "MAY", "JUN", "JUL", "AUG",
                                           "SEP", "OCT", "NOV", "DEC"};
   const chrono::year_month_day civil{date};
-  const auto label =
-      format("{} {:02}", weekdays[chrono::weekday{date}.c_encoding()],
-             static_cast<unsigned>(civil.day()));
-  return include_month
-             ? format("{} {}", label,
-                      months[static_cast<unsigned>(civil.month()) - 1])
-             : label;
+  return format("{} {:02} {}", weekdays[chrono::weekday{date}.c_encoding()],
+                static_cast<unsigned>(civil.day()),
+                months[static_cast<unsigned>(civil.month()) - 1]);
 }
 
 // Count UTF-8 characters so Swedish names do not wrap by byte count.
@@ -139,12 +135,12 @@ mono_image configured_dashboard(
   draw_text(image, afternoon ? "Good afternoon!" : "Good morning!", 24, 20, 4);
   draw_text(image, format("{:02}:{:02}", local.tm_hour, local.tm_min), 660, 12,
             4);
-  draw_text(image, date_label(today, true), 658, 46, 2);
+  draw_text(image, date_label(today), 658, 46, 2);
   image.rectangle(24, 66, 752, 2);
 
   draw_text(image,
             format("{} / {}", afternoon ? "TOMORROW" : "TODAY",
-                   date_label(agenda_day, false)),
+                   date_label(agenda_day)),
             24, 90, 3);
   image.rectangle(506, 90, 2, 262);
 
